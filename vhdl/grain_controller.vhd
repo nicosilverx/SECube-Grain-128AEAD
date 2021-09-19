@@ -183,6 +183,7 @@ begin
 		key_count := 0;
 	elsif(rising_edge(clk)) then
 		case (state) is
+----------------OFF STATE------------------------------------------------------------------------------
 			when OFF =>
 				--CORE SIGNALS
 				rst_c <= '0';
@@ -204,7 +205,7 @@ begin
 			    else
 			    	state <= OFF;
 			    end if;
-
+-------------------READ CW---------------------------------------------------------------------------
 			when WAIT_CW =>
 				--CORE SIGNALS
 				rst_c <= '0';
@@ -257,7 +258,7 @@ begin
 				interrupt <= '0';
 				error <= '0';
 				state <= DECODE_OPCODE;
-
+---------------------EVALUATE PACKET ORGANIZATION------------------------------------------------------------------------
 			WHEN DECODE_OPCODE =>
 				case CW(15 downto 10) is
 					when "000000" => --init encrypt
@@ -281,7 +282,7 @@ begin
 						set_init_core <= '0';
 						state <= WAIT_LENGTH;
 				end case;
-
+--------------------READING KEY-------------------------------------------------------------------------
 		    when WAIT_KEY =>
 		    	if(write_completed = '1') then 
 					buffer_enable <= '1';
@@ -313,7 +314,7 @@ begin
 			    	key_count := 0;
 			    	state <= WAIT_IV;
 			    end if;
-
+-------------------READING INITIALIZTION VECTOR-----------------------------------------------------------------------
 		    WHEN WAIT_IV =>
 		    	if(write_completed = '1') then 
 					buffer_enable <= '1';
@@ -345,7 +346,7 @@ begin
 			    	iv_count := 0;
 			    	state <= WAIT_LENGTH;
 			    end if;
-
+--------------READING LENGHT OF ASSOCIATED DATA AND MESSAGE----------------------------------------------------------------
 		    WHEN WAIT_LENGTH =>
 		    	if(write_completed = '1') then
 					buffer_enable <= '1';
@@ -372,7 +373,7 @@ begin
 				interrupt <= '0';
 				error <= '0';
 				state <= WAIT_AD;
-
+-------------------------READING ASSOCIATED DATA---------------------------------------------------------------
 			WHEN WAIT_AD =>
 				if(write_completed = '1') then 
 					buffer_enable <= '1';
@@ -404,9 +405,7 @@ begin
 			    	ad_count := 0;
 			    	state <= WAIT_MSG;
 			    end if;
-
-			 --todo steps for message
-
+------------------READING MESSAGE------------------------------------------------------------
 			 WHEN WAIT_MSG =>
 				if(write_completed = '1') then 
 					buffer_enable <= '1';
@@ -442,7 +441,7 @@ begin
 			    		state <= COMPUTEs0;
 			    	end if;
 			    end if;
-
+----------------INITIALIZATION VECTOR CORE---------------------------------------------------
 			WHEN INIT_CORE_IV =>
 				if(completed_c = '1') then
 					if(iv_count < 8) then
@@ -467,7 +466,7 @@ begin
 				else
 					state <= INIT_CORE_IV;
 				end if;
-
+-------------------INIT READING KEY CORE-------------------------------------------------------
 			WHEN INIT_CORE_KEY =>
 				if(completed_c = '1') then
 					if(key_count < 8) then
@@ -492,7 +491,7 @@ begin
 				else
 					state <= INIT_CORE_KEY;
 				end if;
-
+-----------------RUN FOR PREPARE OUTPUT---------------------------------------------------
 		    WHEN INIT_CORE_PRE_OUTPUT =>
 		    	IF(completed_c = '1') then
 		    		if(pre_output_count < 256) then
@@ -521,7 +520,7 @@ begin
 				else
 					state <= INIT_CORE_PRE_OUTPUT;
 				end if;
-
+---------------------LOADING ACCUMULATOR-------------------------------------------------------
 			WHEN INIT_CORE_ACC_NEXT_Z =>
 				if(completed_c = '1') then
 					if(acc_count > 64) then
@@ -533,7 +532,6 @@ begin
 						state < WAIT_CORE_ACC_NEXT_Z;
 					else
 						acc_count := 63;
-						NEXT_Z_reg
 						state <= INIT_CORE_SR_NEXT_Z;
 					end if;
 				else
@@ -566,7 +564,49 @@ begin
 				else
 					state <= INIT_CORE_ACC_NEXT_Z;
 				end if;
-
-			--NEXT STATE AUTH_SR
+------------------LOADING SHIFT REGISTER-----------------------------------------------------
 			WHEN INIT_CORE_SR_NEXT_Z =>
-				--TO DO
+				if(completed_c = '1') then
+					if(acc_count >= 64) then
+						operation_c <= NEXT_Z;
+						grain_round_c <= ADD_KEY;
+						start_c <= '1';
+						serial_data_in_c <= KEY(acc_count/16(acc_count mod 16));
+						acc_count := acc_count - 1;
+						state < WAIT_CORE_SR_NEXT_Z;
+					else
+						acc_count := 0;
+						--state <= TO BE DEFINED;
+					end if;
+				else
+					state <= INIT_CORE_SR_NEXT_Z;
+
+			WHEN WAIT_CORE_sR_NEXT_Z =>
+				if(busy = '1') then
+					start_c <= '0';
+					state <= WAIT_CORE_SR_NEXT_Z;
+				else
+					NEXT_Z_reg <= serial_data_out_c;
+					state <= INIT_CORE_SR_LOAD;
+				end if;
+
+			WHEN INIT_CORE_SR_LOAD =>
+				if(completed_c = '1') then
+					start_c <= '1';
+					operation_c <= LOAD_AUTH_SR;
+					grain_round_c <= ADD_KEY;
+					serial_data_in_c <= NEXT_Z_reg;
+					state <= WAIT_CORE_SR_LOAD;
+				else
+					state <= INIT_CORE_SR_LOAD;
+				end if;
+
+			WHEN WAIT_CORE_SR_LOAD =>
+				if(busy_c = '1') then
+					start_c = '0';
+					state <= WAIT_CORE_SR_LOAD;
+				else
+					state <= INIT_CORE_SR_NEXT_Z;
+				end if;
+---------------NEXT STEP--------------------------------------------------------------------
+			WHEN --crypt 
