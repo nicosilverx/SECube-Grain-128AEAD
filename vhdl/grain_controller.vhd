@@ -99,11 +99,13 @@ type statetype is (OFF,
 				   GET_MAC,
 				   WAIT_GET_MAC,
 				   
+				   WRITE_MAC,
+				   WAIT_WRITE_MAC,
 
-           		   ACK_WAITING, 
-           		   WAIT_STATUS_CPU,
-           	       WRITE_RESULT,
-                   WRITE_STATUS, 
+				   WRITE_CT,
+				   WAIT_WRITE_CT,
+
+           		   CLEAR_ALL,
                    DONE);
 
 signal state: statetype; 
@@ -830,7 +832,7 @@ begin
 						state <= WAIT_GET_MAC;
 					else 
 						mac_count := 0;
-						--state <= TO_BE_DEFINED;
+						state <= WRITE_MAC;
 					end if;
 				else 
 					state <= GET_MAC;
@@ -847,5 +849,90 @@ begin
 				end if;
 
 			--WHEN TO_BE_DEFINED =>
-		end case;
-end process;
+
+			WHEN WRITE_MAC =>
+				if(write_completed = '1') then
+					if(mac_count < 4) then
+						buffer_enable <= '1';
+						rw <= '1';
+						address <= std_logic_vector(to_unsigned(1+mac_count, ADD_WIDTH));
+						data_out <= TAG(mac_count);
+						interrupt <= '0';
+						error <= '0';
+						state <= WAIT_WRITE_MAC;
+					else
+						mac_count := 0;
+						state <= WRITE_CT;
+					end if;
+				else
+					state <= WRITE_MAC;
+				end if;
+
+			WHEN WAIT_WRITE_MAC =>
+				if(ack = '1' and enable = '1') then
+					data_out <= TAG(mac_count);
+					buffer_enable <= '1';
+					address <= std_logic_vector(to_unsigned(1+mac_count, ADD_WIDTH));
+					rw <= '1';
+					interrupt <= '0';
+					error <= '0';
+					mac_count := mac_count + 1;
+					state <= WRITE_MAC;
+				else
+					state <= WAIT_WRITE_MAC;
+				end if;
+
+			WHEN WRITE_CT =>
+				if(write_completed = '1') then
+					if(crypt_count < to_integer(unsigned(length_msg))) then
+						data_out <= CT(crypt_count);
+						buffer_enable <= '1';
+						address <= std_logic_vector(to_unsigned(crypt_count+5, ADD_WIDTH));
+						rw <= '1';
+						interrupt <= '0';
+						error <= '0';
+						state <= WAIT_WRITE_CT;
+					else
+						crypt_count := 0;
+						state <= CLEAR_ALL;
+					end if;
+				else
+					state <= WRITE_CT;
+				end if;
+
+			WHEN WAIT_WRITE_CT =>
+				if(ack = '1' and enable = '1') then
+					data_out <= CT(crypt_count);
+					buffer_enable <= '1';
+					address <= std_logic_vector(to_unsigned(5+crypt_count, ADD_WIDTH));
+					rw <= '1';
+					interrupt <= '0';
+					error <= '0';
+					crypt_count := crypt_count + 1;
+					state <= WRITE_CT;
+				else
+					state <= WAIT_WRITE_CT;
+				end if;
+
+			WHEN CLEAR_ALL =>
+				data_out <= (others => '0');
+				buffer_enable <= '0';
+				address <= (others => '0');
+				rw <= '0';
+				interrupt <= '0';
+				error <= '0';
+				state <= DONE;
+
+			WHEN DONE =>
+				if(enable = '0') then
+					state <= OFF;
+				else
+					state <= DONE;
+				end if;
+
+
+			end case;
+
+	end process;
+
+end Behavioral;
