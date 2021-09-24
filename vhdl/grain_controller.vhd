@@ -231,7 +231,7 @@ begin
 		tag_count := 0;
 		crypt_count := 0;
 		ac_count := 0;
-	elsif(rising_edge(clk)) then
+	elsif(rising_edge(clock)) then
 		case (state) is
 ----------------OFF STATE------------------------------------------------------------------------------
 			when OFF =>
@@ -331,6 +331,8 @@ begin
 						lenght_adress_decode := 0;
 						set_init_core <= '0';
 						state <= WAIT_LENGTH;
+					when OTHERS =>
+						state <= OFF;
 				end case;
 --------------------READING KEY-------------------------------------------------------------------------
 		    when WAIT_KEY =>
@@ -582,7 +584,7 @@ begin
 						operation_c <= NEXT_Z;
 						grain_round_c <= ADD_KEY;
 						start_c <= '1';
-						serial_data_in_c <= KEY((acc_count/16)(acc_count mod 16));
+						serial_data_in_c <= KEY(acc_count/16)(acc_count mod 16);
 						acc_count := acc_count - 1;
 						state <= WAIT_CORE_ACC_NEXT_Z;
 					else
@@ -627,7 +629,7 @@ begin
 						operation_c <= NEXT_Z;
 						grain_round_c <= ADD_KEY;
 						start_c <= '1';
-						serial_data_in_c <= KEY(acc_count/16(acc_count mod 16));
+						serial_data_in_c <= KEY(acc_count/16)(acc_count mod 16);
 						acc_count := acc_count - 1;
 						state <= WAIT_CORE_SR_NEXT_Z;
 					else
@@ -695,7 +697,7 @@ begin
 			WHEN TAG_ACCUMULATE =>
 				if(completed_c = '1') then
 					if( ( (tag_count)mod 2) /= 0 ) then
-						if(AD(((to_integer(unsigned(lenght_AD)))-AD_count)/16(((to_integer(unsigned(lenght_AD))) - AD_count) mod 16 ) ) = '1') then
+						if(AD ((to_integer(unsigned(lenght_AD)) - AD_count)/16) ((to_integer(unsigned(lenght_AD)) - AD_count)mod 16) = '1') then
 							start_c <= '1';
 							operation_c <= ACCUMULATE;
 							tag_count := tag_count + 1;
@@ -717,7 +719,7 @@ begin
 --------------ENCRYPTION/DECRYPTION-----------------------------------------------
 			WHEN CIPHER_NEXT_Z =>
 				if(completed_c = '1') then
-					if(crypt_count < to_integer(unsigned(length_msg))*2 ) then
+					if(crypt_count < to_integer(unsigned(lenght_submsg))*2 ) then
 						start_c <= '1';
 						operation_c <= NEXT_Z;
 						grain_round_c <= NORMAL;
@@ -744,10 +746,10 @@ begin
 			WHEN CIPHER_ACCUMULATE =>
 				if(completed_c = '1') then
 					if((crypt_count mod 2) = 0) then
-						CT(to_integer(unsigned(length_msg)) - 1 - msg_count) <= MSG(to_integer(unsigned(length_msg))-1 - msg_count) xor NEXT_Z_reg;
+						CT ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) <= MSG((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) xor NEXT_Z_reg;
 						msg_count := msg_count + 1;
 					else
-						if(MSG(to_integer(unsigned(length_msg))-1 - ac_count)) then
+						if( MSG((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) = '1') then
 							operation_c <= ACCUMULATE;
 							start_c <= '1';
 							state <= WAIT_CIPHER_ACCUMULATE;
@@ -884,7 +886,7 @@ begin
 
 			WHEN WRITE_CT =>
 				if(write_completed = '1') then
-					if(crypt_count < to_integer(unsigned(length_msg))) then
+					if(crypt_count < to_integer(unsigned(lenght_submsg))) then
 						data_out <= CT(crypt_count);
 						buffer_enable <= '1';
 						address <= std_logic_vector(to_unsigned(crypt_count+5, ADD_WIDTH));
@@ -929,10 +931,10 @@ begin
 				else
 					state <= DONE;
 				end if;
-
-
+			
+			WHEN OTHERS =>
+				state <= OFF;
 			end case;
-
-	end process;
-
+	end if;
+end process;
 end Behavioral;
