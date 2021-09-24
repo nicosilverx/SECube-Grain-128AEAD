@@ -90,6 +90,9 @@ type statetype is (OFF,
 				   TAG_ACCUMULATE,
 				   WAIT_TAG_ACCUMULATE,
 				   
+				   TAG_LOAD_SR,
+				   WAIT_TAG_LOAD_SR,
+				   
 				   CIPHER_NEXT_Z,
 				   WAIT_CIPHER_NEXT_Z,
 				   
@@ -183,6 +186,8 @@ signal MSG 			 : Msg_mem;
 signal CT 			 : Msg_mem; --signal to store the cipher text
 type TAG_mem is array (3 downto 0) of std_logic_vector(15 downto 0);
 signal TAG		 : TAG_mem;
+
+signal tmp_sig : integer := 0;
 
 begin
 
@@ -368,7 +373,7 @@ begin
 				rw <= '0';
 				interrupt <= '0';
 				error <= '0';
-				if(key_count < 8) then
+				if(key_count < 7) then
 					key_count := key_count+1;
 					state <= WAIT_KEY;
 			    else
@@ -400,7 +405,7 @@ begin
 				rw <= '0';
 				interrupt <= '0';
 				error <= '0';
-				if(iv_count < 8) then
+				if(iv_count < 7) then
 					iv_count := iv_count+1;
 					state <= WAIT_IV;
 			    else
@@ -463,7 +468,8 @@ begin
 				rw <= '0';
 				interrupt <= '0';
 				error <= '0';
-				if(AD_count < to_integer(unsigned(lenght_AD))) then
+				if(AD_count < to_integer(unsigned(lenght_AD))-1 ) then
+				    tmp_sig <= tmp_sig + 1;
 					ad_count := ad_count+1;
 					state <= WAIT_AD;
 			    else
@@ -480,13 +486,13 @@ begin
 					rw <= '0';
 					interrupt <= '0';
 					error <= '0';
-					state <= ADDR_AD;
+					state <= ADDR_MSG;
 				else
-					state <= WAIT_AD;
+					state <= WAIT_MSG;
 				end if;
 
 			WHEN ADDR_MSG =>
-				state <= READ_AD;
+				state <= READ_MSG;
 
 			WHEN READ_MSG =>
 				MSG(MSG_count) <= data_in;
@@ -496,7 +502,7 @@ begin
 				rw <= '0';
 				interrupt <= '0';
 				error <= '0';
-				if(MSG_count < to_integer(unsigned(lenght_submsg))) then
+				if(MSG_count < to_integer(unsigned(lenght_submsg))-1 ) then
 					MSG_count := MSG_count+1;
 					state <= WAIT_MSG;
 			    else
@@ -510,7 +516,7 @@ begin
 ----------------INITIALIZATION VECTOR CORE---------------------------------------------------
 			WHEN INIT_CORE_IV =>
 				if(completed_c = '1') then
-					if(iv_count < 8) then
+					if(iv_count < 7) then
 						start_c <= '1';
 						operation_c <= LOAD_IV;
 						data_16_in_c <= IV(iv_count);
@@ -535,7 +541,7 @@ begin
 -------------------INIT READING KEY CORE-------------------------------------------------------
 			WHEN INIT_CORE_KEY =>
 				if(completed_c = '1') then
-					if(key_count < 8) then
+					if(key_count < 7) then
 						start_c <= '1';
 						operation_c <= LOAD_KEY;
 						data_16_in_c <= KEY(key_count);
@@ -560,7 +566,7 @@ begin
 -----------------RUN FOR PREPARE OUTPUT---------------------------------------------------
 		    WHEN INIT_CORE_PRE_OUTPUT =>
 		    	IF(completed_c = '1') then
-		    		if(pre_output_count < 256) then
+		    		if(pre_output_count < 255) then
 		    			operation_c <= NEXT_Z;
 		    			grain_round_c <= INIT;
 		    			start_c <= '1';
@@ -643,7 +649,7 @@ begin
 						state <= WAIT_CORE_SR_NEXT_Z;
 					else
 						acc_count := 0;
-						--state <= TO BE DEFINED;
+						state <= TAG_NEXT_Z;
 					end if;
 				else
 					state <= INIT_CORE_SR_NEXT_Z;
@@ -680,6 +686,7 @@ begin
 			WHEN TAG_NEXT_Z =>
 				if(completed_c = '1') then
 					if(tag_count < to_integer(unsigned(lenght_AD))*2) then
+					    report "tag_count: " & integer'image(tag_count);
 						start_c <= '1';
 						operation_c <= NEXT_Z;
 						grain_round_c <= NORMAL;
@@ -706,12 +713,19 @@ begin
 			WHEN TAG_ACCUMULATE =>
 				if(completed_c = '1') then
 					if( ( (tag_count)mod 2) /= 0 ) then
-						if(AD ((to_integer(unsigned(lenght_AD)) - AD_count)/16) ((to_integer(unsigned(lenght_AD)) - AD_count)mod 16) = '1') then
+					    --report "tag_count mod 2 != 0";
+						if(AD ((to_integer(unsigned(lenght_AD)) - ad_count)/16) ((to_integer(unsigned(lenght_AD)) - ad_count)mod 16) = '1') then
+						    --report "ad=1";
 							start_c <= '1';
 							operation_c <= ACCUMULATE;
-							tag_count := tag_count + 1;
 							state <= WAIT_TAG_ACCUMULATE;
+					    else
+					       report "ad=0";
+					       state <= TAG_LOAD_SR;
 						end if;
+				    else
+				        state <= WAIT_TAG_ACCUMULATE;
+				        --report "tag_count mod 2 == 0";
 					end if;
 				else
 					state <= TAG_ACCUMULATE;
@@ -722,9 +736,29 @@ begin
 				if(busy_c = '1') then
 					state <= WAIT_TAG_ACCUMULATE;
 				else
-					AD_count := ad_count + 1;
-					state <= TAG_NEXT_Z;
+					state <= TAG_LOAD_SR;
 				end if;
+			
+			WHEN TAG_LOAD_SR =>
+			     if(completed_c = '1') then
+			         start_c <= '1';
+			         operation_c <= LOAD_AUTH_SR;
+			         serial_data_in_c <= NEXT_Z_reg;
+			         state <= WAIT_TAG_LOAD_SR;
+			     else 
+			         state <= TAG_LOAD_SR;
+			     end if;
+			     
+			WHEN WAIT_TAG_LOAD_SR =>
+			     start_c <= '0';
+			     if(busy_c = '1')then
+			         state <= WAIT_TAG_LOAD_SR;
+			     else
+			         tag_count := tag_count + 1;
+			         ad_count := ad_count + 1;
+			         state <= TAG_NEXT_Z;
+			     end if;
+			
 --------------ENCRYPTION/DECRYPTION-----------------------------------------------
 			WHEN CIPHER_NEXT_Z =>
 				if(completed_c = '1') then
@@ -745,7 +779,7 @@ begin
 
 			WHEN WAIT_CIPHER_NEXT_Z =>
 				start_c <= '0';
-				if(busy_c <= '1') then
+				if(busy_c = '1') then
 					state <= WAIT_CIPHER_NEXT_Z;
 				else
 					NEXT_Z_reg <= serial_data_out_c;
@@ -757,11 +791,14 @@ begin
 					if((crypt_count mod 2) = 0) then
 						CT ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) <= MSG((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) xor NEXT_Z_reg;
 						msg_count := msg_count + 1;
+						state <= CIPHER_LOAD_SR;
 					else
 						if( MSG((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) = '1') then
 							operation_c <= ACCUMULATE;
 							start_c <= '1';
 							state <= WAIT_CIPHER_ACCUMULATE;
+						else
+						    state <= CIPHER_LOAD_SR;
 						end if;
 						ac_count := ac_count + 1;
 					end if;

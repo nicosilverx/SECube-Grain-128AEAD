@@ -155,6 +155,42 @@ begin
 		
 		wait for HCLK_PERIOD*24; -- random number of cc before starting
 		
+		write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); --Init, encrypt
+		--Key
+		write("000001", x"0123");
+		write("000010", x"4567");
+		write("000011", x"89ab");
+		write("000100", x"cdef");
+		write("000101", x"1234");
+		write("000110", x"5678");
+		write("000111", x"9abc");
+		write("001000", x"def0");
+		--IV
+		write("001001", x"0123");
+		write("001010", x"4567");
+		write("001011", x"89ab");
+		write("001100", x"cdef");
+		write("001101", x"1234");
+		write("001110", x"5678");
+		write("001111", x"ffff");
+		write("010000", x"fffe");
+		--Length msg || AD = 0x08 || 0x02 
+		write("010001", x"0802");
+		--AD
+		write("010010", x"1111");
+		--MSG
+		write("010011", x"6369");
+		write("010100", x"616f");
+		write("010101", x"6e65");
+		write("010110", x"2121");
+		for k in 23 to 63 loop
+		  write(std_logic_vector(to_unsigned(k, 6)), x"8000");
+		end loop;
+		
+		wait until rising_edge(interrupt);
+		wait until rising_edge(hclk); -- ISR is called syncronously
+		
+		
 	wait;
 	end process stimuli;
 		
