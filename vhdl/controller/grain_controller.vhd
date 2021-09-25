@@ -192,19 +192,25 @@ signal NEXT_Z_reg		 :  std_logic;
 
 --REGS
 signal CW      		 : std_logic_vector(15  downto 0);
-type IV_mem is array (7 downto 0) of std_logic_vector(15 downto 0);
-signal IV     		 : iv_mem;
-type key_mem is array (7 downto 0) of std_logic_vector(15 downto 0);
-signal key           : key_mem;
+--type IV_mem is array (7 downto 0) of std_logic_vector(15 downto 0);
+--signal IV     		 : iv_mem;
+signal IV : std_logic_vector(127 downto 0);
+--type key_mem is array (7 downto 0) of std_logic_vector(15 downto 0);
+--signal key           : key_mem;
+signal key : std_logic_vector(127 downto 0);
 signal lenght_submsg : std_logic_vector(7   downto 0);
 signal lenght_AD     : std_logic_vector(7   downto 0);
-type AD_mem is array (9 downto 0) of std_logic_vector(15 downto 0);
-signal AD            : AD_mem;
-type Msg_mem is array (60 downto 0) of std_logic_vector(15 downto 0);
-signal MSG 			 : Msg_mem;
-signal CT 			 : Msg_mem; --signal to store the cipher text
-type TAG_mem is array (3 downto 0) of std_logic_vector(15 downto 0);
-signal TAG		 : TAG_mem;
+--type AD_mem is array (9 downto 0) of std_logic_vector(15 downto 0);
+--signal AD            : AD_mem;
+signal AD : std_logic_vector(159 downto 0);
+--type Msg_mem is array (60 downto 0) of std_logic_vector(15 downto 0);
+--signal MSG 			 : Msg_mem;
+--signal CT 			 : Msg_mem; --signal to store the cipher text
+signal MSG : std_logic_vector(959 downto 0);
+signal CT  : std_logic_vector(959 downto 0);
+--type TAG_mem is array (3 downto 0) of std_logic_vector(15 downto 0);
+--signal TAG		 : TAG_mem;
+signal TAG : std_logic_vector(63 downto 0);
 
 signal tmp_sig : integer := 0;
 
@@ -245,14 +251,20 @@ begin
 
 		--registers at 0
 		CW 		      <= (others => '0');
-		IV 			  <= (others => (others=>'0'));
-		KEY 		  <= (others => (others=>'0'));
+		--IV 			  <= (others => (others=>'0'));
+		IV 		      <= (others => '0');
+		--KEY 		  <= (others => (others=>'0'));
+		KEY 		      <= (others => '0');
 		lenght_submsg <= (others => '0');
 		lenght_AD     <= (others => '0');
-		AD  		  <= (others => (others => '0'));
-		MSG 		  <= (others => (others => '0'));
-		CT 			  <= (others => (others => '0'));
-		TAG           <= (others => (others => '0'));
+		--AD  		  <= (others => (others => '0'));
+		AD 		      <= (others => '0');
+		--MSG 		  <= (others => (others => '0'));
+		MSG 		      <= (others => '0');
+		--CT 			  <= (others => (others => '0'));
+		CT 		      <= (others => '0');
+		--TAG           <= (others => (others => '0'));
+		TAG 		  <= (others => '0');
 		OPCODE_REG    <= (others=>'0');
 		key_count := 0;
 		iv_count := 0;
@@ -393,7 +405,7 @@ begin
 		    	state <= READ_KEY;
 
 		    WHEN READ_KEY =>
-		    	key(key_count) <= data_in;
+		    	key((15+(16*key_count)) downto (16*key_count)) <= data_in;
 		    	data_out <= (others => '0');
 		    	buffer_enable <= '0';
 		    	address <= (others => '0');
@@ -427,7 +439,7 @@ begin
 				state <= READ_IV;
 
 			WHEN READ_IV =>
-				IV(iv_count) <= data_in;
+				IV((15+(16*iv_count)) downto (16*iv_count)) <= data_in;
 		    	data_out <= (others => '0');
 		    	buffer_enable <= '0';
 		    	address <= (others => '0');
@@ -494,7 +506,7 @@ begin
 				state <= READ_AD;
 
 			WHEN READ_AD =>
-				AD(AD_count) <= data_in;
+				AD((15+(16*AD_count)) downto (16*AD_count)) <= data_in;
 		    	data_out <= (others => '0');
 		    	buffer_enable <= '0';
 		    	address <= (others => '0');
@@ -530,7 +542,7 @@ begin
 				state <= READ_MSG;
 
 			WHEN READ_MSG =>
-				MSG(MSG_count) <= data_in;
+				MSG((15+(16*MSG_count)) downto (16*MSG_count)) <= data_in;
 		    	data_out <= (others => '0');
 		    	buffer_enable <= '0';
 		    	address <= (others => '0');
@@ -554,7 +566,7 @@ begin
 					if(iv_count <= 7) then
 						start_c <= '1';
 						operation_c <= LOAD_IV;
-						data_16_in_c <= IV(iv_count);
+						data_16_in_c <= IV((15+(16*iv_count)) downto (16*iv_count));
 						data_16_addr_in_c <= std_logic_vector(to_unsigned(IV_count, 3));
 						state <= OP_INIT_CORE_IV;
 					else
@@ -582,7 +594,7 @@ begin
 					if(key_count <= 7) then
 						start_c <= '1';
 						operation_c <= LOAD_KEY;
-						data_16_in_c <= KEY(key_count);
+						data_16_in_c <= KEY((15+(16*key_count)) downto (16*key_count));
 						data_16_addr_in_c <= std_logic_vector(to_unsigned(key_count, 3));
 						report "keycount:" & integer'image(key_count);
 						state <= OP_INIT_CORE_KEY;
@@ -644,9 +656,9 @@ begin
 						operation_c <= NEXT_Z;
 						grain_round_c <= ADD_KEY;
 						start_c <= '1';
-						serial_data_in_c <= KEY(acc_count/16)(acc_count mod 16);
-						debug(0) := KEY(acc_count/16)(acc_count mod 16);
-						report "Key_bit[" & integer'image(acc_count/16) & "][" & integer'image(acc_count mod 16) & "]:" & integer'image(to_integer(unsigned(debug)));
+						serial_data_in_c <= KEY(acc_count);
+						debug(0) := KEY(acc_count);
+						--report "Key_bit[" & integer'image(acc_count/16) & "][" & integer'image(acc_count mod 16) & "]:" & integer'image(to_integer(unsigned(debug)));
 						state <= OP_INIT_CORE_ACC_NEXT_Z;
 					else
 						acc_count := 63;
@@ -704,7 +716,7 @@ begin
 						operation_c <= NEXT_Z;
 						grain_round_c <= ADD_KEY;
 						start_c <= '1';
-						serial_data_in_c <= KEY(acc_count/16)(acc_count mod 16);
+						serial_data_in_c <= KEY(acc_count);
 						state <= OP_INIT_CORE_SR_NEXT_Z;
 					else
 						acc_count := 0;
@@ -783,8 +795,9 @@ begin
 				if(completed_c = '1') then
 					if( ( (tag_count)mod 2) /= 0 ) then
 					    --report "tag_count mod 2 != 0";
-						if(AD ((to_integer(unsigned(lenght_AD)) - ad_count)/16) ((to_integer(unsigned(lenght_AD)) - ad_count)mod 16) = '1') then
-						    --report "ad=1";
+						--if(AD ((to_integer(unsigned(lenght_AD)) - ad_count)/16) ((to_integer(unsigned(lenght_AD)) - ad_count)mod 16) = '1') then
+						    if(AD(to_integer(unsigned(lenght_AD)) - AD_count) = '1') then
+							--report "ad=1";
 							start_c <= '1';
 							operation_c <= ACCUMULATE;
 							state <= OP_TAG_ACCUMULATE;
@@ -867,11 +880,13 @@ begin
 			WHEN CIPHER_ACCUMULATE =>
 				if(completed_c = '1') then
 					if((crypt_count mod 2) = 0) then
-						CT ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) <= MSG((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) xor NEXT_Z_reg;
+						--CT ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) <= MSG((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) xor NEXT_Z_reg;
+						CT(to_integer(unsigned(lenght_submsg)) -1 - msg_count) <= msg(to_integer(unsigned(lenght_submsg)) -1 - msg_count) xor NEXT_Z_reg;
 						msg_count := msg_count + 1;
 						state <= CIPHER_LOAD_SR;
 					else
-						if( MSG((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) = '1') then
+						--if( MSG((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) = '1') then
+						if(MSG(to_integer(unsigned(lenght_submsg)) -1 - msg_count) = '1') then
 							operation_c <= ACCUMULATE;
 							start_c <= '1';
 							state <= OP_CIPHER_ACCUMULATE;
@@ -983,7 +998,7 @@ begin
 				if(busy_c = '1') then
 					state <= WAIT_GET_MAC;
 				else
-					TAG(mac_count) <= data_16_out_c;
+					TAG((15+(16*mac_count)) downto (16*mac_count)) <= data_16_out_c;
 					mac_count := mac_count + 1;
 					state <= GET_MAC;
 				end if;
@@ -994,7 +1009,7 @@ begin
 						buffer_enable <= '1';
 						rw <= '1';
 						address <= std_logic_vector(to_unsigned(1+mac_count, ADD_WIDTH));
-						data_out <= TAG(mac_count);
+						data_out <= TAG((15+(16*mac_count)) downto (16*mac_count));
 						interrupt <= '1';
 						error <= '0';
 						state <= OP_WRITE_MAC;
@@ -1002,7 +1017,7 @@ begin
 						buffer_enable <= '1';
 						rw <= '1';
 						address <= std_logic_vector(to_unsigned(1+mac_count, ADD_WIDTH));
-						data_out <= TAG(mac_count);
+						data_out <= TAG((15+(16*mac_count)) downto (16*mac_count));
 						interrupt <= '0';
 						error <= '0';
 						state <= OP_WRITE_MAC;
@@ -1019,7 +1034,7 @@ begin
                 
 			WHEN WAIT_WRITE_MAC =>
 				if(ack = '1' and enable = '1') then
-					data_out <= TAG(mac_count);
+					data_out <= TAG((15+(16*mac_count)) downto (16*mac_count));
 					buffer_enable <= '1';
 					address <= std_logic_vector(to_unsigned(1+mac_count, ADD_WIDTH));
 					rw <= '1';
@@ -1034,7 +1049,7 @@ begin
 			WHEN WRITE_CT =>
 				if(write_completed = '1') then
 					if(crypt_count < to_integer(unsigned(lenght_submsg))) then
-						data_out <= CT(crypt_count);
+						data_out <= CT((15+(16*crypt_count)) downto (16*crypt_count));
 						buffer_enable <= '1';
 						address <= std_logic_vector(to_unsigned(crypt_count+5, ADD_WIDTH));
 						rw <= '1';
@@ -1054,7 +1069,7 @@ begin
                 
 			WHEN WAIT_WRITE_CT =>
 				if(ack = '1' and enable = '1') then
-					data_out <= CT(crypt_count);
+					data_out <= CT((15+(16*crypt_count)) downto (16*crypt_count));
 					buffer_enable <= '1';
 					address <= std_logic_vector(to_unsigned(5+crypt_count, ADD_WIDTH));
 					rw <= '1';
