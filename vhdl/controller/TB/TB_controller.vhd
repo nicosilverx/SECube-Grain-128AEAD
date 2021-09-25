@@ -152,39 +152,46 @@ begin
 		end read;
 		
 	begin
-		
+		--Key: 80C4 A2E6 91D5 B3F7 482C 6A1E 593D 7B0F
+		--IV:  80C4 A2E6 91D5 B3F7 482C 6A1E FFFF FFFE
 		wait for HCLK_PERIOD*24; -- random number of cc before starting
 		
-		write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); --Init, encrypt
+		write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); --Init, encrypt 0
 		--Key
-		write("000001", x"0123");
-		write("000010", x"4567");
-		write("000011", x"89ab");
-		write("000100", x"cdef");
-		write("000101", x"1234");
-		write("000110", x"5678");
-		write("000111", x"9abc");
-		write("001000", x"def0");
+		write("000001", x"7B0F"); --1
+		write("000010", x"593D"); --2
+		write("000011", x"6A1E"); --3
+		write("000100", x"482C"); --4
+		write("000101", x"B3F7"); --5
+		write("000110", x"91D5"); --6
+		write("000111", x"A2E6"); --7
+		write("001000", x"80C4"); --8
 		--IV
-		write("001001", x"0123");
-		write("001010", x"4567");
-		write("001011", x"89ab");
-		write("001100", x"cdef");
-		write("001101", x"1234");
-		write("001110", x"5678");
-		write("001111", x"ffff");
-		write("010000", x"fffe");
+		write("001001", x"FFFE"); --9
+		write("001010", x"FFFF"); --10
+		write("001011", x"6A1E"); --11
+		write("001100", x"482C"); --12
+		write("001101", x"B3F7"); --13
+		write("001110", x"91D5"); --14
+		write("001111", x"A2E6"); --15
+		write("010000", x"80C4"); --16
 		--Length msg || AD = 0x08 || 0x02 
-		write("010001", x"0802");
+		write("010001", x"0802"); --17
 		--AD
-		write("010010", x"1111");
+		write("010010", x"1111"); --18
+		--Padding for AD
+		for k in 19 to 27 loop
+		  --write(std_logic_vector(to_unsigned(k, 6)), x"8000");
+		end loop;
+		
 		--MSG
-		write("010011", x"6369");
-		write("010100", x"616f");
-		write("010101", x"6e65");
-		write("010110", x"2121");
-		for k in 23 to 63 loop
-		  write(std_logic_vector(to_unsigned(k, 6)), x"8000");
+		write("011100", x"6369"); --28
+		write("011101", x"616f"); --29
+		write("011110", x"6e65"); --30
+		write("011111", x"2121"); --31
+		--Padding for MSG
+		for k in 32 to 63 loop
+		  --write(std_logic_vector(to_unsigned(k, 6)), x"8000");
 		end loop;
 		
 		wait until rising_edge(interrupt);

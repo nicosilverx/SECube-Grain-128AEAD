@@ -69,11 +69,13 @@ architecture STRUCTURAL of TOP_ENTITY is
 	signal	error_ip   				 : std_logic_vector(NUM_IPS-1 downto 0);    
 	signal 	cpu_read_completed_ip    : std_logic_vector(NUM_IPS-1 downto 0);
 	signal 	cpu_write_completed_ip   : std_logic_vector(NUM_IPS-1 downto 0);
+	
+	signal not_clk : std_logic := '0';
 
 begin
 
 	fpga_gpio_leds <= (others => '1');
-
+    not_clk <= not(cpu_fpga_clk);
 	data_buff: entity work.DATA_BUFFER
 		generic map(
 			ADDSET => ADDSET,

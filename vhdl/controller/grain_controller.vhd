@@ -64,57 +64,76 @@ type statetype is (OFF,
 				   READ_MSG,
 				   
 				   INIT_CORE_IV,
+				   OP_INIT_CORE_IV,
 				   WAIT_CORE_IV,
 				   
 				   INIT_CORE_KEY,
+				   OP_INIT_CORE_KEY,
 				   WAIT_CORE_KEY,
 				   
 				   INIT_CORE_PRE_OUTPUT,
+				   OP_INIT_CORE_PRE_OUTPUT,
 				   WAIT_CORE_PRE_OUTPUT,
 				   
 				   INIT_CORE_ACC_NEXT_Z,
+				   OP_INIT_CORE_ACC_NEXT_Z,
+				   WAIT_LATCH_CORE_ACC_NEXT_Z,
 				   WAIT_CORE_ACC_NEXT_Z,
 				   
 				   INIT_CORE_ACC_LOAD,
+				   OP_INIT_CORE_ACC_LOAD,
 				   WAIT_CORE_ACC_LOAD,
 				   
 				   INIT_CORE_SR_NEXT_Z,
+				   OP_INIT_CORE_SR_NEXT_Z,
 				   WAIT_CORE_SR_NEXT_Z,
 				   
 				   INIT_CORE_SR_LOAD,
+				   OP_INIT_CORE_SR_LOAD,
 				   WAIT_CORE_SR_LOAD,
 				   
 				   TAG_NEXT_Z,
+				   OP_TAG_NEXT_Z,
 				   WAIT_TAG_NEXT_Z,
 				   
 				   TAG_ACCUMULATE,
+				   OP_TAG_ACCUMULATE,
 				   WAIT_TAG_ACCUMULATE,
 				   
 				   TAG_LOAD_SR,
+				   OP_TAG_LOAD_SR,
 				   WAIT_TAG_LOAD_SR,
 				   
 				   CIPHER_NEXT_Z,
+				   OP_CIPHER_NEXT_Z,
 				   WAIT_CIPHER_NEXT_Z,
 				   
 				   CIPHER_ACCUMULATE,
+				   OP_CIPHER_ACCUMULATE,
 				   WAIT_CIPHER_ACCUMULATE,
 				   
 				   CIPHER_LOAD_SR,
+				   OP_CIPHER_LOAD_SR,
 				   WAIT_CIPHER_LOAD_SR,
 				   
 				   GENERATE_USELESS_NEXT_Z,
+				   OP_USELESS_NEXT_Z,
 				   WAIT_USELESS_NEXT_Z,
 				   
 				   USELESS_ACCUMULATE,
+				   OP_USELESS_ACCUMULATE,
 				   WAIT_USELESS_ACCUMULATE,
 				   
 				   GET_MAC,
+				   OP_GET_MAC,
 				   WAIT_GET_MAC,
 				   
 				   WRITE_MAC,
+				   OP_WRITE_MAC,
 				   WAIT_WRITE_MAC,
 
 				   WRITE_CT,
+				   OP_WRITE_CT,
 				   WAIT_WRITE_CT,
 
            		   CLEAR_ALL,
@@ -210,7 +229,8 @@ variable tag_count			  : integer := 0;	--Variable to accumulate tag and loop bet
 variable crypt_count		  : integer := 0;
 variable ac_count			  : integer :=0; --variable to index the message during encryption/decryption
 variable mac_count			  : integer :=0; 
-
+variable wc_count             : integer :=0;
+variable debug : std_logic_vector(0 downto 0) := "0";
 begin
 	if(reset = '1') then
 		--CORE SIGNALS
@@ -245,6 +265,7 @@ begin
 		tag_count := 0;
 		crypt_count := 0;
 		ac_count := 0;
+		wc_count := 0;
 	elsif(rising_edge(clock)) then
 		case (state) is
 ----------------OFF STATE------------------------------------------------------------------------------
@@ -257,6 +278,8 @@ begin
 				start_c <= '0';
 				operation_c <= (others => '0');
 				grain_round_c <= (others => '0');
+				wc_count := 0;
+				NEXT_Z_reg <= '0';
 				----------------------------
 				data_out <=  (others => '0');
 				buffer_enable <= '0';
@@ -281,6 +304,8 @@ begin
 				grain_round_c <= (others => '0');
 				----------------------------
 				if(write_completed = '1') then
+				    wc_count := wc_count + 1;
+				    report "wc_count: " & integer'image(wc_count);
 					buffer_enable <= '1';
 					address <= std_logic_vector(to_unsigned(0, ADD_WIDTH));
 					data_out <= (others => '0'); 
@@ -327,21 +352,21 @@ begin
 				case CW(15 downto 10) is
 					when "000000" => --init encrypt
 						state <= WAIT_KEY;
-						msg_address_decode := 27;
+						msg_address_decode := 28;
 						lenght_adress_decode := 17;
 						set_init_core <= '1';
 					when "000001" => --encrypt message
-						msg_address_decode := 0;
+						msg_address_decode := 1;
 						lenght_adress_decode := 0;
 						state <= WAIT_LENGTH;
 						set_init_core <= '0';
 					when "000010" => --init decrypt
 						state <= WAIT_KEY;
-						msg_address_decode := 27;
+						msg_address_decode := 28;
 						lenght_adress_decode := 17;
 						set_init_core <= '1';
 					when "000011" => --decrypt message
-						msg_address_decode := 0;
+						msg_address_decode := 1;
 						lenght_adress_decode := 0;
 						set_init_core <= '0';
 						state <= WAIT_LENGTH;
@@ -350,7 +375,9 @@ begin
 				end case;
 --------------------READING KEY-------------------------------------------------------------------------
 		    when WAIT_KEY =>
-		    	if(write_completed = '1') then 
+		    	if(write_completed = '1' OR wc_count>(1+key_count)) then 
+		    	    wc_count := wc_count + 1;
+				    report "wc_count: " & integer'image(wc_count);
 					buffer_enable <= '1';
 					address <= std_logic_vector(to_unsigned(key_count+1, ADD_WIDTH));
 					data_out <= (others => '0'); 
@@ -382,7 +409,9 @@ begin
 			    end if;
 -------------------READING INITIALIZTION VECTOR-----------------------------------------------------------------------
 		    WHEN WAIT_IV =>
-		    	if(write_completed = '1') then 
+		    	if(write_completed = '1' OR wc_count>(1+8+IV_count)) then 
+					wc_count := wc_count + 1;
+				    report "wc_count: " & integer'image(wc_count);
 					buffer_enable <= '1';
 					address <= std_logic_vector(to_unsigned(IV_count+1+8, ADD_WIDTH));
 					data_out <= (others => '0'); 
@@ -414,7 +443,9 @@ begin
 			    end if;
 --------------READING LENGHT OF ASSOCIATED DATA AND MESSAGE----------------------------------------------------------------
 		    WHEN WAIT_LENGTH =>
-		    	if(write_completed = '1') then
+		    	if(write_completed = '1' OR wc_count>(1+8+8+1)) then
+					wc_count := wc_count + 1;
+				    report "wc_count: " & integer'image(wc_count);
 					buffer_enable <= '1';
 					address <= std_logic_vector(to_unsigned(lenght_adress_decode, ADD_WIDTH)); 
 					data_out <= (others => '0'); 
@@ -445,9 +476,11 @@ begin
 				end if;
 -------------------------READING ASSOCIATED DATA---------------------------------------------------------------
 			WHEN WAIT_AD =>
-				if(write_completed = '1') then 
+				if(write_completed = '1' OR wc_count> (1+8+8+1+AD_count)) then 
+					wc_count := wc_count + 1;
+				    report "wc_count: " & integer'image(wc_count);
 					buffer_enable <= '1';
-					address <= std_logic_vector(to_unsigned(AD_count+1+18, ADD_WIDTH));
+					address <= std_logic_vector(to_unsigned(AD_count+18, ADD_WIDTH));
 					data_out <= (others => '0'); 
 					rw <= '0';
 					interrupt <= '0';
@@ -468,7 +501,7 @@ begin
 				rw <= '0';
 				interrupt <= '0';
 				error <= '0';
-				if(AD_count < to_integer(unsigned(lenght_AD))-1 ) then
+				if(AD_count <= to_integer(unsigned(lenght_AD)) ) then
 				    tmp_sig <= tmp_sig + 1;
 					ad_count := ad_count+1;
 					state <= WAIT_AD;
@@ -479,9 +512,11 @@ begin
 ------------------READING MESSAGE------------------------------------------------------------
 			 
 			 WHEN WAIT_MSG =>
-				if(write_completed = '1') then 
+				if(write_completed = '1' OR wc_count> (1+8+8+1+to_integer(unsigned(lenght_AD)) + MSG_count)) then 
+					wc_count := wc_count + 1;
+				    report "wc_count: " & integer'image(wc_count);
 					buffer_enable <= '1';
-					address <= std_logic_vector(to_unsigned(MSG_count+1+msg_address_decode, ADD_WIDTH));
+					address <= std_logic_vector(to_unsigned(MSG_count+msg_address_decode, ADD_WIDTH));
 					data_out <= (others => '0'); 
 					rw <= '0';
 					interrupt <= '0';
@@ -502,7 +537,7 @@ begin
 				rw <= '0';
 				interrupt <= '0';
 				error <= '0';
-				if(MSG_count < to_integer(unsigned(lenght_submsg))-1 ) then
+				if(MSG_count <= to_integer(unsigned(lenght_submsg)) ) then
 					MSG_count := MSG_count+1;
 					state <= WAIT_MSG;
 			    else
@@ -516,13 +551,12 @@ begin
 ----------------INITIALIZATION VECTOR CORE---------------------------------------------------
 			WHEN INIT_CORE_IV =>
 				if(completed_c = '1') then
-					if(iv_count < 7) then
+					if(iv_count <= 7) then
 						start_c <= '1';
 						operation_c <= LOAD_IV;
 						data_16_in_c <= IV(iv_count);
 						data_16_addr_in_c <= std_logic_vector(to_unsigned(IV_count, 3));
-						iv_count := iv_count + 1;
-						state <= WAIT_CORE_IV;
+						state <= OP_INIT_CORE_IV;
 					else
 						iv_count := 0;
 						state <= INIT_CORE_KEY;
@@ -530,24 +564,28 @@ begin
 				else
 					state <= INIT_CORE_IV;
 				end if;
-
+            
+            WHEN OP_INIT_CORE_IV =>
+                state <= WAIT_CORE_IV;
+            
 			WHEN WAIT_CORE_IV =>
 			    start_c <= '0';
 				if(busy_c = '1') then
 					state <= WAIT_CORE_IV;
 				else
+				    iv_count := iv_count + 1;
 					state <= INIT_CORE_IV;
 				end if;
 -------------------INIT READING KEY CORE-------------------------------------------------------
 			WHEN INIT_CORE_KEY =>
 				if(completed_c = '1') then
-					if(key_count < 7) then
+					if(key_count <= 7) then
 						start_c <= '1';
 						operation_c <= LOAD_KEY;
 						data_16_in_c <= KEY(key_count);
 						data_16_addr_in_c <= std_logic_vector(to_unsigned(key_count, 3));
-						key_count := key_count + 1;
-						state <= WAIT_CORE_KEY;
+						report "keycount:" & integer'image(key_count);
+						state <= OP_INIT_CORE_KEY;
 					else
 						key_count := 0;
 						state <= INIT_CORE_PRE_OUTPUT;
@@ -555,28 +593,31 @@ begin
 				else
 					state <= INIT_CORE_KEY;
 				end if;
-
+            
+            WHEN OP_INIT_CORE_KEY =>
+                state <= WAIT_CORE_KEY;
+            
 			WHEN WAIT_CORE_KEY =>
 			    start_c <= '0';
 				if(busy_c = '1') then
 					state <= WAIT_CORE_KEY;
 				else
+				    key_count := key_count + 1;
 					state <= INIT_CORE_KEY;
 				end if;
 -----------------RUN FOR PREPARE OUTPUT---------------------------------------------------
 		    WHEN INIT_CORE_PRE_OUTPUT =>
 		    	IF(completed_c = '1') then
-		    		if(pre_output_count < 255) then
+		    		if(pre_output_count <= 255) then
 		    			operation_c <= NEXT_Z;
 		    			grain_round_c <= INIT;
 		    			start_c <= '1';
-		    			pre_output_count := pre_output_count + 1;
 		    			--core signals setup
 		    			data_16_in_c <= (others => '0');
 		    			data_16_addr_in_c <= (others => '0');
 		    			serial_data_in_c <= '0';
 		    			-------------------------------------
-		    			state <= WAIT_CORE_PRE_OUTPUT;
+		    			state <= OP_INIT_CORE_PRE_OUTPUT;
 		    		else
 		    			pre_output_count := 0;
 		    			state <= INIT_CORE_ACC_NEXT_Z;
@@ -584,12 +625,16 @@ begin
 		    	else
 		    		state <= INIT_CORE_PRE_OUTPUT;
 		    	end if;
-
+            
+            WHEN OP_INIT_CORE_PRE_OUTPUT =>
+                state <= WAIT_CORE_PRE_OUTPUT;
+                
 		    WHEN WAIT_CORE_PRE_OUTPUT =>
 				start_c <= '0';
 				if(busy_c = '1') then
 					state <= WAIT_CORE_PRE_OUTPUT;
 				else
+				    pre_output_count := pre_output_count + 1;
 					state <= INIT_CORE_PRE_OUTPUT;
 				end if;
 ---------------------LOADING ACCUMULATOR-------------------------------------------------------
@@ -600,8 +645,9 @@ begin
 						grain_round_c <= ADD_KEY;
 						start_c <= '1';
 						serial_data_in_c <= KEY(acc_count/16)(acc_count mod 16);
-						acc_count := acc_count - 1;
-						state <= WAIT_CORE_ACC_NEXT_Z;
+						debug(0) := KEY(acc_count/16)(acc_count mod 16);
+						report "Key_bit[" & integer'image(acc_count/16) & "][" & integer'image(acc_count mod 16) & "]:" & integer'image(to_integer(unsigned(debug)));
+						state <= OP_INIT_CORE_ACC_NEXT_Z;
 					else
 						acc_count := 63;
 						state <= INIT_CORE_SR_NEXT_Z;
@@ -609,32 +655,46 @@ begin
 				else
 					state <= INIT_CORE_ACC_NEXT_Z;
                 end if;
-                
+            
+            WHEN OP_INIT_CORE_ACC_NEXT_Z =>
+                state <= WAIT_CORE_ACC_NEXT_Z;
+
 			WHEN WAIT_CORE_ACC_NEXT_Z =>
 				start_c <= '0';
 				if(busy_c = '1') then
 					state <= WAIT_CORE_ACC_NEXT_Z;
 				else
-					NEXT_Z_reg <= serial_data_out_c;
-					state <= INIT_CORE_ACC_LOAD;
+					state <= WAIT_LATCH_CORE_ACC_NEXT_Z;
 				end if;
-
+            
+            WHEN WAIT_LATCH_CORE_ACC_NEXT_Z =>
+                if(completed_c = '1') then
+                    NEXT_Z_reg <= serial_data_out_c;
+                    state <= INIT_CORE_ACC_LOAD;
+                else
+                    state <= WAIT_LATCH_CORE_ACC_NEXT_Z;
+                end if;
+                
 			WHEN INIT_CORE_ACC_LOAD =>
 				if(completed_c = '1') then
 					start_c <= '1';
 					operation_c <= LOAD_AUTH_ACC;
 					grain_round_c <= ADD_KEY;
 					serial_data_in_c <= NEXT_Z_reg;
-					state <= WAIT_CORE_ACC_LOAD;
+					state <= OP_INIT_CORE_ACC_LOAD;
 				else
 					state <= INIT_CORE_ACC_LOAD;
 				end if;
-
+            
+            WHEN OP_INIT_CORE_ACC_LOAD =>
+                state <= WAIT_CORE_ACC_LOAD;
+                
 			WHEN WAIT_CORE_ACC_LOAD =>
 				start_c <= '0';
 				if(busy_c = '1') then
 					state <= WAIT_CORE_ACC_LOAD;
 				else
+				    acc_count := acc_count - 1;
 					state <= INIT_CORE_ACC_NEXT_Z;
 				end if;
 ------------------LOADING SHIFT REGISTER-----------------------------------------------------
@@ -645,8 +705,7 @@ begin
 						grain_round_c <= ADD_KEY;
 						start_c <= '1';
 						serial_data_in_c <= KEY(acc_count/16)(acc_count mod 16);
-						acc_count := acc_count - 1;
-						state <= WAIT_CORE_SR_NEXT_Z;
+						state <= OP_INIT_CORE_SR_NEXT_Z;
 					else
 						acc_count := 0;
 						state <= TAG_NEXT_Z;
@@ -654,7 +713,10 @@ begin
 				else
 					state <= INIT_CORE_SR_NEXT_Z;
 				end if;
-
+            
+            WHEN OP_INIT_CORE_SR_NEXT_Z =>
+                state <= WAIT_CORE_SR_NEXT_Z;
+            
 			WHEN WAIT_CORE_SR_NEXT_Z =>
 				start_c <= '0';
 				if(busy_c = '1') then
@@ -663,23 +725,27 @@ begin
 					NEXT_Z_reg <= serial_data_out_c;
 					state <= INIT_CORE_SR_LOAD;
 				end if;
-
+        
 			WHEN INIT_CORE_SR_LOAD =>
 				if(completed_c = '1') then
 					start_c <= '1';
 					operation_c <= LOAD_AUTH_SR;
 					grain_round_c <= ADD_KEY;
 					serial_data_in_c <= NEXT_Z_reg;
-					state <= WAIT_CORE_SR_LOAD;
+					state <= OP_INIT_CORE_SR_LOAD;
 				else
 					state <= INIT_CORE_SR_LOAD;
 				end if;
-
+              
+            WHEN OP_INIT_CORE_SR_LOAD =>
+                state <= WAIT_CORE_SR_LOAD;   
+              
 			WHEN WAIT_CORE_SR_LOAD =>
 				start_c <= '0';
 				if(busy_c = '1') then
 					state <= WAIT_CORE_SR_LOAD;
 				else
+					acc_count := acc_count - 1;
 					state <= INIT_CORE_SR_NEXT_Z;
 				end if;
 ---------------ACCUMULATE TAG--------------------------------------------------------------------
@@ -691,7 +757,7 @@ begin
 						operation_c <= NEXT_Z;
 						grain_round_c <= NORMAL;
 						serial_data_in_c <= '0';
-						state <= WAIT_TAG_NEXT_Z;
+						state <= OP_TAG_NEXT_Z;
 					else
 						tag_count := 0;
 						ad_count := 0;
@@ -700,7 +766,10 @@ begin
 				else
 					state <= TAG_NEXT_Z;
 				end if;
-
+            
+            WHEN OP_TAG_NEXT_Z =>
+                state <= WAIT_TAG_NEXT_Z;
+            
 			WHEN WAIT_TAG_NEXT_Z =>
 				start_c <= '0';
 				if(busy_c = '1') then
@@ -718,19 +787,22 @@ begin
 						    --report "ad=1";
 							start_c <= '1';
 							operation_c <= ACCUMULATE;
-							state <= WAIT_TAG_ACCUMULATE;
+							state <= OP_TAG_ACCUMULATE;
 					    else
 					       report "ad=0";
 					       state <= TAG_LOAD_SR;
 						end if;
 				    else
-				        state <= WAIT_TAG_ACCUMULATE;
+				        state <= OP_TAG_ACCUMULATE;
 				        --report "tag_count mod 2 == 0";
 					end if;
 				else
 					state <= TAG_ACCUMULATE;
 				end if;
-
+            
+            WHEN OP_TAG_ACCUMULATE =>
+                state <= WAIT_TAG_ACCUMULATE;
+            
 			WHEN WAIT_TAG_ACCUMULATE =>
 				start_c <= '0';
 				if(busy_c = '1') then
@@ -744,11 +816,14 @@ begin
 			         start_c <= '1';
 			         operation_c <= LOAD_AUTH_SR;
 			         serial_data_in_c <= NEXT_Z_reg;
-			         state <= WAIT_TAG_LOAD_SR;
+			         state <= OP_TAG_LOAD_SR;
 			     else 
 			         state <= TAG_LOAD_SR;
 			     end if;
-			     
+			
+			WHEN OP_TAG_LOAD_SR =>
+			     state <= WAIT_TAG_LOAD_SR;
+			    
 			WHEN WAIT_TAG_LOAD_SR =>
 			     start_c <= '0';
 			     if(busy_c = '1')then
@@ -767,7 +842,7 @@ begin
 						operation_c <= NEXT_Z;
 						grain_round_c <= NORMAL;
 						serial_data_in_c <= '0';
-						state <= WAIT_CIPHER_NEXT_Z;
+						state <= OP_CIPHER_NEXT_Z;
 					else
 						crypt_count := 0;
 						msg_count := 0;
@@ -776,7 +851,10 @@ begin
 				else
 					state <= CIPHER_NEXT_Z;
 				end if;
-
+            
+            WHEN OP_CIPHER_NEXT_Z =>
+                state <= WAIT_CIPHER_NEXT_Z;
+            
 			WHEN WAIT_CIPHER_NEXT_Z =>
 				start_c <= '0';
 				if(busy_c = '1') then
@@ -796,7 +874,7 @@ begin
 						if( MSG((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) = '1') then
 							operation_c <= ACCUMULATE;
 							start_c <= '1';
-							state <= WAIT_CIPHER_ACCUMULATE;
+							state <= OP_CIPHER_ACCUMULATE;
 						else
 						    state <= CIPHER_LOAD_SR;
 						end if;
@@ -805,7 +883,10 @@ begin
 				else
 					state <= CIPHER_ACCUMULATE;
 				end if;
-
+            
+            WHEN OP_CIPHER_ACCUMULATE =>
+                state <= WAIT_CIPHER_ACCUMULATE;
+                
 			WHEN WAIT_CIPHER_ACCUMULATE =>
 				start_c <= '0'; -- remember to move start for other wait statement
 				if(busy_c = '1') then
@@ -820,11 +901,14 @@ begin
 					operation_c <= LOAD_AUTH_SR;
 					serial_data_in_c <= NEXT_Z_reg;
 					start_c <= '1';
-					state  <= WAIT_CIPHER_LOAD_SR;
+					state  <= OP_CIPHER_LOAD_SR;
 				else
 					state <= CIPHER_LOAD_SR;
 				end if;
-
+            
+            WHEN OP_CIPHER_LOAD_SR =>
+                state <= WAIT_CIPHER_LOAD_SR;
+            
 			WHEN WAIT_CIPHER_LOAD_SR =>
 				start_c <= '0';
 				if(busy_c = '1') then
@@ -840,28 +924,34 @@ begin
 					grain_round_c <= NORMAL;
 					serial_data_in_c <= '0';
 					start_c <= '1';
-					state <= USELESS_ACCUMULATE;
+					state <= OP_USELESS_NEXT_Z;
 				else
-					state <= WAIT_USELESS_NEXT_Z;
+					state <= GENERATE_USELESS_NEXT_Z;
 				end if;
-
+            
+            WHEN OP_USELESS_NEXT_Z =>
+                state <= WAIT_USELESS_NEXT_Z;
+                
 			WHEN WAIT_USELESS_NEXT_Z =>
 				start_c <= '0';
 				if(busy_c = '1') then
 					state <= WAIT_USELESS_NEXT_Z;
 				else
-					state <= GENERATE_USELESS_NEXT_Z;
+					state <= USELESS_ACCUMULATE;
 				end if;
 
 			WHEN USELESS_ACCUMULATE =>
 				if(completed_c = '1') then
 					start_c <= '1';
 					operation_c <= ACCUMULATE;
-					state <= WAIT_USELESS_ACCUMULATE;
+					state <= OP_USELESS_ACCUMULATE;
 				else 
 					state <= USELESS_ACCUMULATE;
 				end if;
-
+            
+            WHEN OP_USELESS_ACCUMULATE =>
+                state <= WAIT_USELESS_ACCUMULATE;
+                
 			WHEN WAIT_USELESS_ACCUMULATE =>
 				start_c <= '0';
 				if(busy_c = '1') then
@@ -876,7 +966,7 @@ begin
 						operation_c <= READ_AUTH_ACC;
 						data_16_addr_in_c <= std_logic_vector(to_unsigned(mac_count, 3));
 						start_c <= '1';
-						state <= WAIT_GET_MAC;
+						state <= OP_GET_MAC;
 					else 
 						mac_count := 0;
 						state <= WRITE_MAC;
@@ -884,7 +974,10 @@ begin
 				else 
 					state <= GET_MAC;
 				end if;
-
+            
+            WHEN OP_GET_MAC =>
+                state <= WAIT_GET_MAC;
+                
 			WHEN WAIT_GET_MAC =>
 				start_c <= '0';
 				if(busy_c = '1') then
@@ -895,8 +988,6 @@ begin
 					state <= GET_MAC;
 				end if;
 
-			--WHEN TO_BE_DEFINED =>
-
 			WHEN WRITE_MAC =>
 				if(write_completed = '1') then
 					if(mac_count = 0) then
@@ -906,7 +997,7 @@ begin
 						data_out <= TAG(mac_count);
 						interrupt <= '1';
 						error <= '0';
-						state <= WAIT_WRITE_MAC;
+						state <= OP_WRITE_MAC;
 					elsif(mac_count > 0 and mac_count < 4) then
 						buffer_enable <= '1';
 						rw <= '1';
@@ -914,7 +1005,7 @@ begin
 						data_out <= TAG(mac_count);
 						interrupt <= '0';
 						error <= '0';
-						state <= WAIT_WRITE_MAC;
+						state <= OP_WRITE_MAC;
 					else
 						mac_count := 0;
 						state <= WRITE_CT;
@@ -922,7 +1013,10 @@ begin
 				else
 					state <= WRITE_MAC;
 				end if;
-
+            
+            WHEN OP_WRITE_MAC =>
+                state <= WAIT_WRITE_MAC;
+                
 			WHEN WAIT_WRITE_MAC =>
 				if(ack = '1' and enable = '1') then
 					data_out <= TAG(mac_count);
@@ -946,7 +1040,7 @@ begin
 						rw <= '1';
 						interrupt <= '0';
 						error <= '0';
-						state <= WAIT_WRITE_CT;
+						state <= OP_WRITE_CT;
 					else
 						crypt_count := 0;
 						state <= CLEAR_ALL;
@@ -954,7 +1048,10 @@ begin
 				else
 					state <= WRITE_CT;
 				end if;
-
+            
+            WHEN OP_WRITE_CT =>
+                state <= WAIT_WRITE_CT;
+                
 			WHEN WAIT_WRITE_CT =>
 				if(ack = '1' and enable = '1') then
 					data_out <= CT(crypt_count);

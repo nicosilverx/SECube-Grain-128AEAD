@@ -79,7 +79,6 @@ begin
     elsif(rising_edge(clk)) then
         case state is
             when OFF =>
-                        serial_data_out <= '0';
                         completed <= '1';
                         busy <= '0';
                         if(start = '1')then
@@ -89,6 +88,7 @@ begin
                             grain_round_i <= grain_round;
                             serial_data_in_i <= serial_data_in;
                             state <= SELECT_OP;
+                            serial_data_out <= '0';
                         else
                             state <= OFF;
                         end if;
@@ -166,7 +166,8 @@ begin
                                   data_16_out <= auth_acc(15+(16*to_integer(unsigned(data_16_addr_in_i))) downto (16*to_integer(unsigned(data_16_addr_in_i))));
                                   serial_data_out <= '0';
                                   completed <= '0';
-                                  state <= DONE;                                                                      
+                                  state <= DONE;    
+                                                                              
             when DONE =>
                                   busy <= '1';
                                   completed <= '1';
