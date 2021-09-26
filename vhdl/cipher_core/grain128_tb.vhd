@@ -210,7 +210,9 @@ begin
             if(j mod 2 = 0)then
                 --Donothing
             else
-                report "Ad_cnt : " & integer'image(ad_cnt);
+                --report "Ad_cnt : " & integer'image(ad_cnt);
+                next_z_output_vector(0) := ad(((ad'LENGTH - 1)) - ad_cnt);
+                report "ad_val : " & integer'image(to_integer(unsigned(next_z_output_vector)));
                 if(ad(((ad'LENGTH - 1)) - ad_cnt) = '1')then
                      --Accumulate
                     operation_s <= "101"; -- accumulate

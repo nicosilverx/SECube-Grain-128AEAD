@@ -731,12 +731,6 @@ begin
 					operation_c <= LOAD_AUTH_ACC;
 					grain_round_c <= ADD_KEY;
 					serial_data_in_c <= NEXT_Z_reg;
-					
---					debug(0) := KEY(acc_count);
---					report "Key_bit[" & integer'image(acc_count) & "]:" & integer'image(to_integer(unsigned(debug)));
---					debug(0) := NEXT_Z_reg;
---					report "Next_z: " & integer'image(to_integer(unsigned(debug)));
-					
 					state <= OP_INIT_CORE_ACC_LOAD;
 				else
 					state <= INIT_CORE_ACC_LOAD;
@@ -815,7 +809,6 @@ begin
 			WHEN TAG_NEXT_Z =>
 				if(completed_c = '1') then
 					if(tag_count < (to_integer(unsigned(lenght_AD) + 1)*2*8)) then
-					    --report "tag_count: " & integer'image(tag_count);
 						start_c <= '1';
 						operation_c <= NEXT_Z;
 						grain_round_c <= NORMAL;
@@ -853,20 +846,21 @@ begin
             
 			WHEN TAG_ACCUMULATE =>
 				if(completed_c = '1') then
-					if( ( (tag_count)mod 2) /= 0 ) then
-					        if(AD(to_integer(unsigned((lenght_AD))+1)*8 - AD_count) = '1') then
-                                report "accumulate()";
-                                start_c <= '1';
-                                operation_c <= ACCUMULATE;
-                                state <= OP_TAG_ACCUMULATE;
-                            else
-                                start_c <= '0';
-                                state <= TAG_LOAD_SR;
-                            end if;
-                            ad_count := ad_count + 1;
+					if( ( (tag_count)mod 2) = 0 ) then
+					       state <= WAIT_TAG_LOAD_SR;
 				    else
-				        state <= OP_TAG_ACCUMULATE;
-				        --report "tag_count mod 2 == 0";
+				        debug(0) := AD(to_integer(unsigned(lenght_AD) + 1)*8 - 1 - AD_count);
+				        report "ad_val: " & integer'image(to_integer(unsigned(debug)));
+				        
+				        if( AD(to_integer(unsigned(lenght_AD) + 1)*8 - 1 - AD_count) = '1') then
+                            start_c <= '1';
+                            operation_c <= ACCUMULATE;
+                            state <= OP_TAG_ACCUMULATE;
+                        else
+                            start_c <= '0';
+                            state <= TAG_LOAD_SR;
+                        end if;
+                        ad_count := ad_count + 1;
 					end if;
 				else
 					state <= TAG_ACCUMULATE;
@@ -888,18 +882,12 @@ begin
 			         start_c <= '1';
 			         operation_c <= LOAD_AUTH_SR;
 			         serial_data_in_c <= NEXT_Z_reg;
-			         
-			        --debug(0) := NEXT_Z_reg;
-				    --report "next_z: " & integer'image(to_integer(unsigned(debug)));
-				    
 			         state <= OP_TAG_LOAD_SR;
 			     else 
 			         state <= TAG_LOAD_SR;
 			     end if;
 			
 			WHEN OP_TAG_LOAD_SR =>
-			     --debug(0) := serial_data_in_c;
-				 --report "serial_data_in_c: " & integer'image(to_integer(unsigned(debug)));
 			     state <= WAIT_TAG_LOAD_SR;
 			    
 			WHEN WAIT_TAG_LOAD_SR =>
@@ -944,12 +932,10 @@ begin
 			WHEN CIPHER_ACCUMULATE =>
 				if(completed_c = '1') then
 					if((crypt_count mod 2) = 0) then
-						--CT ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) <= MSG((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) xor NEXT_Z_reg;
 						CT(to_integer(unsigned(lenght_submsg)) -1 - msg_count) <= msg(to_integer(unsigned(lenght_submsg)) -1 - msg_count) xor NEXT_Z_reg;
 						msg_count := msg_count + 1;
 						state <= CIPHER_LOAD_SR;
 					else
-						--if( MSG((to_integer(unsigned(lenght_submsg)) - 1 - msg_count)/16) ((to_integer(unsigned(lenght_submsg)) - 1 - msg_count) mod 16) = '1') then
 						if(MSG(to_integer(unsigned(lenght_submsg)) -1 - msg_count) = '1') then
 							operation_c <= ACCUMULATE;
 							start_c <= '1';
