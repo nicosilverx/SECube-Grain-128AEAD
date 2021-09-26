@@ -157,32 +157,28 @@ begin
 		wait for HCLK_PERIOD*24; -- random number of cc before starting
 		
 		write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); --Init, encrypt 0
-		--Key
-		write("000001", x"7B0F"); --1
-		write("000010", x"593D"); --2
-		write("000011", x"6A1E"); --3
-		write("000100", x"482C"); --4
-		write("000101", x"B3F7"); --5
-		write("000110", x"91D5"); --6
-		write("000111", x"A2E6"); --7
-		write("001000", x"80C4"); --8
-		--IV
-		write("001001", x"FFFE"); --9
-		write("001010", x"FFFF"); --10
-		write("001011", x"6A1E"); --11
-		write("001100", x"482C"); --12
-		write("001101", x"B3F7"); --13
-		write("001110", x"91D5"); --14
-		write("001111", x"A2E6"); --15
-		write("010000", x"80C4"); --16
+		--Key (not swapped)
+		write("000001", x"def0"); --1
+		write("000010", x"9abc"); --2
+		write("000011", x"5678"); --3
+		write("000100", x"1234"); --4
+		write("000101", x"cdef"); --5
+		write("000110", x"89ab"); --6
+		write("000111", x"4567"); --7
+		write("001000", x"0123"); --8
+		--IV (not swapped)
+		write("001001", x"5678"); --9
+		write("001010", x"1234"); --10
+		write("001011", x"cdef"); --11
+		write("001100", x"89ab"); --12
+		write("001101", x"4567"); --13
+		write("001110", x"0123"); --14
 		--Length msg || AD = 0x08 || 0x02 
 		write("010001", x"0802"); --17
 		--AD
 		write("010010", x"1111"); --18
 		--Padding for AD
-		for k in 19 to 27 loop
-		  --write(std_logic_vector(to_unsigned(k, 6)), x"8000");
-		end loop;
+		
 		
 		--MSG
 		write("011100", x"6369"); --28
@@ -190,9 +186,45 @@ begin
 		write("011110", x"6e65"); --30
 		write("011111", x"2121"); --31
 		--Padding for MSG
-		for k in 32 to 63 loop
-		  --write(std_logic_vector(to_unsigned(k, 6)), x"8000");
-		end loop;
+		
+		
+		
+		--Key
+--		write("000001", x"7B0F"); --1
+--		write("000010", x"593D"); --2
+--		write("000011", x"6A1E"); --3
+--		write("000100", x"482C"); --4
+--		write("000101", x"B3F7"); --5
+--		write("000110", x"91D5"); --6
+--		write("000111", x"A2E6"); --7
+--		write("001000", x"80C4"); --8
+--		--IV
+--		write("001001", x"FFFE"); --9
+--		write("001010", x"FFFF"); --10
+--		write("001011", x"6A1E"); --11
+--		write("001100", x"482C"); --12
+--		write("001101", x"B3F7"); --13
+--		write("001110", x"91D5"); --14
+--		write("001111", x"A2E6"); --15
+--		write("010000", x"80C4"); --16
+--		--Length msg || AD = 0x08 || 0x02 
+--		write("010001", x"0802"); --17
+--		--AD
+--		write("010010", x"1111"); --18
+--		--Padding for AD
+--		for k in 19 to 27 loop
+--		  --write(std_logic_vector(to_unsigned(k, 6)), x"8000");
+--		end loop;
+		
+--		--MSG
+--		write("011100", x"6369"); --28
+--		write("011101", x"616f"); --29
+--		write("011110", x"6e65"); --30
+--		write("011111", x"2121"); --31
+--		--Padding for MSG
+--		for k in 32 to 63 loop
+--		  --write(std_logic_vector(to_unsigned(k, 6)), x"8000");
+--		end loop;
 		
 		wait until rising_edge(interrupt);
 		wait until rising_edge(hclk); -- ISR is called syncronously
