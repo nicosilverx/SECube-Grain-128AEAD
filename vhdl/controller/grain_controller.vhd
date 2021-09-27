@@ -130,10 +130,12 @@ type statetype is (OFF,
 				   CIPHER_NEXT_Z,
 				   OP_CIPHER_NEXT_Z,
 				   WAIT_CIPHER_NEXT_Z,
+				   WAIT_LATCH_CIPHER_NEXT_Z,
 				   
 				   CIPHER_ACCUMULATE,
 				   OP_CIPHER_ACCUMULATE,
 				   WAIT_CIPHER_ACCUMULATE,
+				   
 				   
 				   CIPHER_LOAD_SR,
 				   OP_CIPHER_LOAD_SR,
@@ -228,6 +230,8 @@ signal TAG : std_logic_vector(63 downto 0);
 
 signal tmp_sig : integer := 0;
 
+signal wc_count : integer := 0;
+
 begin
 
 core: grain128_core port map (clock, rst_c, data_16_in_c, data_16_addr_in_c, serial_data_in_c, start_c,
@@ -235,6 +239,18 @@ core: grain128_core port map (clock, rst_c, data_16_in_c, data_16_addr_in_c, ser
 	                          completed_c, busy_c);
 
 ------------------------------------------------------------------------
+process (clock, reset)
+begin
+    if(reset = '1') then
+        wc_count <= 1;
+    elsif(rising_edge(clock)) then
+        if(write_completed = '1') then
+            wc_count <= wc_count + 1;
+            
+        end if;
+    end if;
+end process;
+
 process (clock, reset)
 
 variable key_count   		  : integer := 0;
@@ -249,8 +265,10 @@ variable tag_count			  : integer := 0;	--Variable to accumulate tag and loop bet
 variable crypt_count		  : integer := 0;
 variable ac_count			  : integer :=0; --variable to index the message during encryption/decryption
 variable mac_count			  : integer :=0; 
-variable wc_count             : integer :=0;
+--variable wc_count             : integer :=0;
 variable debug : std_logic_vector(0 downto 0) := "0";
+variable debug1 : std_logic_vector(0 downto 0) := "0";
+variable debug2 : std_logic_vector(0 downto 0) := "0";
 begin
 	if(reset = '1') then
 		--CORE SIGNALS
@@ -287,7 +305,7 @@ begin
 		tag_count := 0;
 		crypt_count := 0;
 		ac_count := 0;
-		wc_count := 0;
+		--wc_count := 0;
 	elsif(rising_edge(clock)) then
 		case (state) is
 ----------------OFF STATE------------------------------------------------------------------------------
@@ -300,7 +318,8 @@ begin
 				start_c <= '0';
 				operation_c <= (others => '0');
 				grain_round_c <= (others => '0');
-				wc_count := 0;
+				--wc_count := 0;
+				--wc_count <= 0;
 				NEXT_Z_reg <= '0';
 				----------------------------
 				data_out <=  (others => '0');
@@ -334,7 +353,7 @@ begin
                 tag_count := 0;
                 crypt_count := 0;
                 ac_count := 0;
-                wc_count := 0;
+                --wc_count := 0;
                 ----------------------------------
 			    if(enable = '1') then
 			    	state <= WAIT_CW;
@@ -352,8 +371,9 @@ begin
 				operation_c <= (others => '0');
 				grain_round_c <= (others => '0');
 				----------------------------
-				if(write_completed = '1') then
-				    wc_count := wc_count + 1;
+				--if(write_completed = '1') then
+				  if(wc_count = 1 OR write_completed = '1') then
+				    --wc_count := wc_count + 1;
 				    --report "wc_count: " & integer'image(wc_count);
 					buffer_enable <= '1';
 					address <= std_logic_vector(to_unsigned(0, ADD_WIDTH));
@@ -424,8 +444,9 @@ begin
 				end case;
 --------------------READING KEY-------------------------------------------------------------------------
 		    when WAIT_KEY =>
-		    	if(write_completed = '1' OR wc_count>(1+key_count)) then 
-		    	    wc_count := wc_count + 1;
+		    	--if(write_completed = '1' OR wc_count>(1+key_count)) then
+		    	if(wc_count>(1+key_count)) then
+		    	    --wc_count := wc_count + 1;
 				    --report "wc_count: " & integer'image(wc_count);
 					buffer_enable <= '1';
 					address <= std_logic_vector(to_unsigned(key_count+1, ADD_WIDTH));
@@ -458,8 +479,9 @@ begin
 			    end if;
 -------------------READING INITIALIZTION VECTOR-----------------------------------------------------------------------
 		    WHEN WAIT_IV =>
-		    	if(write_completed = '1' OR wc_count>(1+8+IV_count)) then 
-					wc_count := wc_count + 1;
+		    	--if(write_completed = '1' OR wc_count>(1+8+IV_count)) then
+		    	if(wc_count>(1+8+IV_count)) then
+					--wc_count := wc_count + 1;
 				    --report "wc_count: " & integer'image(wc_count);
 					buffer_enable <= '1';
 					address <= std_logic_vector(to_unsigned(IV_count+1+8, ADD_WIDTH));
@@ -492,8 +514,9 @@ begin
 			    end if;
 --------------READING LENGHT OF ASSOCIATED DATA AND MESSAGE----------------------------------------------------------------
 		    WHEN WAIT_LENGTH =>
-		    	if(write_completed = '1' OR wc_count>(1+8+6+1)) then
-					wc_count := wc_count + 1;
+		    	--if(write_completed = '1' OR wc_count>(1+8+6+1)) then
+		    	if(wc_count>(1+8+6+1)) then
+					--wc_count := wc_count + 1;
 --				    report "wc_count: " & integer'image(wc_count);
 					buffer_enable <= '1';
 					address <= std_logic_vector(to_unsigned(lenght_adress_decode, ADD_WIDTH)); 
@@ -526,8 +549,9 @@ begin
 				end if;
 -------------------------READING ASSOCIATED DATA---------------------------------------------------------------
 			WHEN WAIT_AD =>
-				if(write_completed = '1' OR wc_count> (1+8+6+1+AD_count)) then 
-					wc_count := wc_count + 1;
+--				if(write_completed = '1' OR wc_count> (1+8+6+1+AD_count)) then 
+--					wc_count := wc_count + 1;
+                if(wc_count> (1+8+6+1+AD_count)) then 
 --				    report "wc_count: " & integer'image(wc_count);
 					buffer_enable <= '1';
 					address <= std_logic_vector(to_unsigned(AD_count+18, ADD_WIDTH));
@@ -551,7 +575,7 @@ begin
 				rw <= '0';
 				interrupt <= '0';
 				error <= '0';
-				if(AD_count < (to_integer(unsigned(lenght_AD))/2)) then
+				if(AD_count < (to_integer(unsigned(lenght_AD))/2)-1) then
 				    tmp_sig <= tmp_sig + 1;
 					ad_count := ad_count+1;
 					state <= WAIT_AD;
@@ -561,12 +585,12 @@ begin
 			    	-- AD_length || AD
 			    	AD(7+(8*to_integer(unsigned(lenght_AD))) downto (8*to_integer(unsigned(lenght_AD)))) <= lenght_AD_swap;
 			    end if;
-------------------READING MESSAGE------------------------------------------------------------
-			 
+------------------READING MESSAGE------------------------------------------------------------			 
 			 WHEN WAIT_MSG =>
-				if(write_completed = '1' OR wc_count> (1+8+6+1+(to_integer(unsigned(lenght_AD))/2) + MSG_count)) then 
-					wc_count := wc_count + 1;
---				    report "wc_count: " & integer'image(wc_count) & "should be > " & integer'image((1+8+6+1+(to_integer(unsigned(lenght_AD))/2) + MSG_count));
+--				if(write_completed = '1' OR wc_count> (1+8+6+1+(to_integer(unsigned(lenght_AD))/2) + MSG_count)) then 
+--					wc_count := wc_count + 1;
+                if(wc_count> (1+8+6+1+(to_integer(unsigned(lenght_AD))/2) + MSG_count)) then
+				    report "wc_count: " & integer'image(wc_count) & "should be > " & integer'image((1+8+6+1+(to_integer(unsigned(lenght_AD))/2) + MSG_count));
 					buffer_enable <= '1';
 					address <= std_logic_vector(to_unsigned(MSG_count+msg_address_decode, ADD_WIDTH));
 					data_out <= (others => '0'); 
@@ -589,7 +613,7 @@ begin
 				rw <= '0';
 				interrupt <= '0';
 				error <= '0';
-				if(MSG_count < (to_integer(unsigned(lenght_submsg))/2)) then
+				if(MSG_count < (to_integer(unsigned(lenght_submsg))/2)-1) then
 					MSG_count := MSG_count+1;
 					state <= WAIT_MSG;
 			    else
@@ -837,8 +861,6 @@ begin
             WHEN WAIT_LATCH_TAG_NEXT_Z =>
                 if(completed_c = '1') then
                     NEXT_Z_reg <= serial_data_out_c;
-                    
-				    
                     state <= TAG_ACCUMULATE;
                 else
                     state <= WAIT_LATCH_TAG_NEXT_Z;
@@ -902,13 +924,16 @@ begin
 --------------ENCRYPTION/DECRYPTION-----------------------------------------------
 			WHEN CIPHER_NEXT_Z =>
 				if(completed_c = '1') then
-					if(crypt_count < to_integer(unsigned(lenght_submsg))*2 ) then
+					if(crypt_count < to_integer(unsigned(lenght_submsg))*2*8 ) then
 						start_c <= '1';
 						operation_c <= NEXT_Z;
 						grain_round_c <= NORMAL;
 						serial_data_in_c <= '0';
 						state <= OP_CIPHER_NEXT_Z;
 					else
+					    report "msg_count " & integer'image(msg_count);
+					    report "crypt_count " & integer'image(crypt_count);
+					    report "ac_count " & integer'image(ac_count);
 						crypt_count := 0;
 						msg_count := 0;
 						state <= GENERATE_USELESS_NEXT_Z;
@@ -925,19 +950,30 @@ begin
 				if(busy_c = '1') then
 					state <= WAIT_CIPHER_NEXT_Z;
 				else
-					NEXT_Z_reg <= serial_data_out_c;
-					state <= CIPHER_ACCUMULATE;
+					state <= WAIT_LATCH_CIPHER_NEXT_Z;
 				end if;
+				
+			WHEN WAIT_LATCH_CIPHER_NEXT_Z =>
+                if(completed_c = '1') then
+                    NEXT_Z_reg <= serial_data_out_c;
+                    debug(0) := serial_data_out_c;
+                    state <= CIPHER_ACCUMULATE;
+                else
+                    state <= WAIT_LATCH_CIPHER_NEXT_Z;
+                end if;
 
 			WHEN CIPHER_ACCUMULATE =>
 				if(completed_c = '1') then
 					if((crypt_count mod 2) = 0) then
-						CT(to_integer(unsigned(lenght_submsg)) -1 - msg_count) <= msg(to_integer(unsigned(lenght_submsg)) -1 - msg_count) xor NEXT_Z_reg;
+						CT(to_integer(unsigned(lenght_submsg))*8 - 1 - msg_count) <= MSG(to_integer(unsigned(lenght_submsg))*8 - 1  - MSG_count) xor NEXT_Z_reg;
+						debug1(0) := MSG(to_integer(unsigned(lenght_submsg))*8 - 1  - MSG_count);
+						report "message: " & integer'image(to_integer(unsigned(debug1))) & " NEXT_Z: " & integer'image(to_integer(unsigned(debug)));
 						msg_count := msg_count + 1;
 						state <= CIPHER_LOAD_SR;
 					else
-						if(MSG(to_integer(unsigned(lenght_submsg)) -1 - msg_count) = '1') then
+						if(MSG(to_integer(unsigned(lenght_submsg))*8 - 1  - MSG_count) = '1') then -- index out of bound -1
 							operation_c <= ACCUMULATE;
+							report "accumulate: " & integer'image(crypt_count/2);
 							start_c <= '1';
 							state <= OP_CIPHER_ACCUMULATE;
 						else
@@ -960,11 +996,9 @@ begin
 					state <= CIPHER_LOAD_SR;
 				end if;
 
-
 			WHEN CIPHER_LOAD_SR =>
 				if(completed_c = '1') then
 					operation_c <= LOAD_AUTH_SR;
-					
 					serial_data_in_c <= NEXT_Z_reg;
 					start_c <= '1';
 					state  <= OP_CIPHER_LOAD_SR;

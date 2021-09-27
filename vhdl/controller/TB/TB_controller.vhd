@@ -152,6 +152,7 @@ begin
 		end read;
 		
 	begin
+	   
 		--Key: 80C4 A2E6 91D5 B3F7 482C 6A1E 593D 7B0F
 		--IV:  80C4 A2E6 91D5 B3F7 482C 6A1E FFFF FFFE
 		wait for HCLK_PERIOD*24; -- random number of cc before starting
@@ -177,14 +178,15 @@ begin
 		write("010001", x"0802"); --17
 		--AD
 		write("010010", x"1111"); --18
+		--write("010011", x"1111"); --18
 		--Padding for AD
 		
 		
 		--MSG
-		write("011100", x"6369"); --28
-		write("011101", x"616f"); --29
-		write("011110", x"6e65"); --30
-		write("011111", x"2121"); --31
+		write("011100", x"2121"); --28
+		write("011101", x"6e65"); --29
+		write("011110", x"616f"); --30
+		write("011111", x"6369"); --31
 		--Padding for MSG
 		
 		
