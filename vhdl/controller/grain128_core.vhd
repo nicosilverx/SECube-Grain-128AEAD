@@ -155,7 +155,7 @@ begin
                                   state <= DONE;
                                   
             when ACCUMULATE   =>  busy <= '1';
-                                  report "Auth_acc: " & to_hstring(auth_acc) & "\n Auth_sr: " & to_hstring(auth_sr);
+                                  --report "Auth_acc: " & to_hstring(auth_acc) & "\n Auth_sr: " & to_hstring(auth_sr);
                                   auth_acc <= auth_acc xor auth_sr;
                                   serial_data_out <= '0';
                                   completed <= '0';

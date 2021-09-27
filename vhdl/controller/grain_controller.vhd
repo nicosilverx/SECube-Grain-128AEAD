@@ -152,6 +152,7 @@ type statetype is (OFF,
 				   GET_MAC,
 				   OP_GET_MAC,
 				   WAIT_GET_MAC,
+				   WAIT_LATCH_GET_MAC,
 				   
 				   WRITE_MAC,
 				   OP_WRITE_MAC,
@@ -265,6 +266,7 @@ variable tag_count			  : integer := 0;	--Variable to accumulate tag and loop bet
 variable crypt_count		  : integer := 0;
 variable ac_count			  : integer :=0; --variable to index the message during encryption/decryption
 variable mac_count			  : integer :=0; 
+variable ct_swap              : integer :=0;
 --variable wc_count             : integer :=0;
 variable debug : std_logic_vector(0 downto 0) := "0";
 variable debug1 : std_logic_vector(0 downto 0) := "0";
@@ -871,8 +873,8 @@ begin
 					if( ( (tag_count)mod 2) = 0 ) then
 					       state <= WAIT_TAG_LOAD_SR;
 				    else
-				        debug(0) := AD(to_integer(unsigned(lenght_AD) + 1)*8 - 1 - AD_count);
-				        report "ad_val: " & integer'image(to_integer(unsigned(debug)));
+				        --debug(0) := AD(to_integer(unsigned(lenght_AD) + 1)*8 - 1 - AD_count);
+				        --report "ad_val: " & integer'image(to_integer(unsigned(debug)));
 				        
 				        if( AD(to_integer(unsigned(lenght_AD) + 1)*8 - 1 - AD_count) = '1') then
                             start_c <= '1';
@@ -965,15 +967,15 @@ begin
 			WHEN CIPHER_ACCUMULATE =>
 				if(completed_c = '1') then
 					if((crypt_count mod 2) = 0) then
-						CT(to_integer(unsigned(lenght_submsg))*8 - 1 - msg_count) <= MSG(to_integer(unsigned(lenght_submsg))*8 - 1  - MSG_count) xor NEXT_Z_reg;
-						debug1(0) := MSG(to_integer(unsigned(lenght_submsg))*8 - 1  - MSG_count);
-						report "message: " & integer'image(to_integer(unsigned(debug1))) & " NEXT_Z: " & integer'image(to_integer(unsigned(debug)));
+						CT(to_integer(unsigned(lenght_submsg))*8 - 1 - msg_count) <= MSG(to_integer(unsigned(lenght_submsg))*8 - 1 - MSG_count) xor NEXT_Z_reg;
+						 ct_swap := to_integer(unsigned(lenght_submsg))*8 - 1 - msg_count;
+ 
 						msg_count := msg_count + 1;
-						state <= CIPHER_LOAD_SR;
+						state <= WAIT_CIPHER_LOAD_SR;
 					else
-						if(MSG(to_integer(unsigned(lenght_submsg))*8 - 1  - MSG_count) = '1') then -- index out of bound -1
+						if(MSG(to_integer(unsigned(lenght_submsg))*8  - 1 - ac_count) = '1') then 
 							operation_c <= ACCUMULATE;
-							report "accumulate: " & integer'image(crypt_count/2);
+							--report "accumulate: " & integer'image(crypt_count/2);
 							start_c <= '1';
 							state <= OP_CIPHER_ACCUMULATE;
 						else
@@ -989,7 +991,7 @@ begin
                 state <= WAIT_CIPHER_ACCUMULATE;
                 
 			WHEN WAIT_CIPHER_ACCUMULATE =>
-				start_c <= '0'; -- remember to move start for other wait statement
+				start_c <= '0';
 				if(busy_c = '1') then
 					state <= WAIT_CIPHER_ACCUMULATE;
 				else
@@ -1083,25 +1085,32 @@ begin
 				if(busy_c = '1') then
 					state <= WAIT_GET_MAC;
 				else
-					TAG((15+(16*mac_count)) downto (16*mac_count)) <= data_16_out_c;
-					mac_count := mac_count + 1;
-					state <= GET_MAC;
+					state <= WAIT_LATCH_GET_MAC;
 				end if;
 
+            WHEN WAIT_LATCH_GET_MAC =>
+                if(completed_c = '1') then
+                    TAG((15+(16*mac_count)) downto (16*mac_count)) <= swapsb(data_16_out_c(15 downto 8)) & swapsb(data_16_out_c(7 downto 0));
+                    state <= GET_MAC;
+					mac_count := mac_count + 1;
+                else
+                    state <= WAIT_LATCH_GET_MAC;
+                end if;
+--------------------------------------------------------------------------------------------------            
 			WHEN WRITE_MAC =>
-				if(write_completed = '1') then
+				if(completed_c = '1') then
 					if(mac_count = 0) then
 						buffer_enable <= '1';
 						rw <= '1';
-						address <= std_logic_vector(to_unsigned(1+mac_count, ADD_WIDTH));
+						address <= std_logic_vector(to_unsigned(mac_count+msg_address_decode, ADD_WIDTH));
 						data_out <= TAG((15+(16*mac_count)) downto (16*mac_count));
-						interrupt <= '1';
+						interrupt <= '0';
 						error <= '0';
 						state <= OP_WRITE_MAC;
 					elsif(mac_count > 0 and mac_count < 4) then
 						buffer_enable <= '1';
 						rw <= '1';
-						address <= std_logic_vector(to_unsigned(1+mac_count, ADD_WIDTH));
+						address <= std_logic_vector(to_unsigned(mac_count+msg_address_decode, ADD_WIDTH));
 						data_out <= TAG((15+(16*mac_count)) downto (16*mac_count));
 						interrupt <= '0';
 						error <= '0';
@@ -1118,10 +1127,10 @@ begin
                 state <= WAIT_WRITE_MAC;
                 
 			WHEN WAIT_WRITE_MAC =>
-				if(ack = '1' and enable = '1') then
+				if(enable = '1') then
 					data_out <= TAG((15+(16*mac_count)) downto (16*mac_count));
 					buffer_enable <= '1';
-					address <= std_logic_vector(to_unsigned(1+mac_count, ADD_WIDTH));
+					address <= std_logic_vector(to_unsigned(mac_count+msg_address_decode, ADD_WIDTH));
 					rw <= '1';
 					interrupt <= '0';
 					error <= '0';
@@ -1132,11 +1141,11 @@ begin
 				end if;
 -----------------GIVE THE MESSAGE ENCRYPTED/DECRYPTED IN OUTPUT---------------------------------------------------
 			WHEN WRITE_CT =>
-				if(write_completed = '1') then
+				if(completed_c = '1') then
 					if(crypt_count < to_integer(unsigned(lenght_submsg))) then
-						data_out <= CT((15+(16*crypt_count)) downto (16*crypt_count));
+						data_out <= swapsb(CT((15+(16*crypt_count)) downto 8+(16*crypt_count))) & swapsb(CT((7+(16*crypt_count)) downto (16*crypt_count)));
 						buffer_enable <= '1';
-						address <= std_logic_vector(to_unsigned(crypt_count+5, ADD_WIDTH));
+						address <= std_logic_vector(to_unsigned(crypt_count+msg_address_decode+4, ADD_WIDTH));
 						rw <= '1';
 						interrupt <= '0';
 						error <= '0';
@@ -1144,6 +1153,7 @@ begin
 					else
 						crypt_count := 0;
 						state <= CLEAR_ALL;
+						interrupt <= '1';
 					end if;
 				else
 					state <= WRITE_CT;
@@ -1153,10 +1163,10 @@ begin
                 state <= WAIT_WRITE_CT;
                 
 			WHEN WAIT_WRITE_CT =>
-				if(ack = '1' and enable = '1') then
+				if(enable = '1') then
 					data_out <= CT((15+(16*crypt_count)) downto (16*crypt_count));
 					buffer_enable <= '1';
-					address <= std_logic_vector(to_unsigned(5+crypt_count, ADD_WIDTH));
+					address <= std_logic_vector(to_unsigned(crypt_count+msg_address_decode+4, ADD_WIDTH));
 					rw <= '1';
 					interrupt <= '0';
 					error <= '0';

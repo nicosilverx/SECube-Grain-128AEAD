@@ -230,7 +230,18 @@ begin
 		
 		wait until rising_edge(interrupt);
 		wait until rising_edge(hclk); -- ISR is called syncronously
+		report "ho letto l'interrupt";
 		
+		--MAC
+		read("011100"); --28
+		read("011101"); --29
+		read("011110"); --30
+		read("011111"); --31
+		--CT
+		read("100000"); --32
+		read("100001"); --33
+		read("100010"); --34
+		read("100011"); --35
 		
 	wait;
 	end process stimuli;
