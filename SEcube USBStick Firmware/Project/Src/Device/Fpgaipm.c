@@ -44,7 +44,7 @@ static FPGA_IPM_BOOLEAN checkCore(FPGA_IPM_CORE coreID);
 static void writeRow0(FPGA_IPM_DATA newRow0);
 static void readRow0();
 
-extern FPGA_IPM_DATA interrupt_signal;
+FPGA_IPM_DATA interrupt_signal;
 
 
 FPGA_IPM_BOOLEAN FPGA_IPM_init() {
