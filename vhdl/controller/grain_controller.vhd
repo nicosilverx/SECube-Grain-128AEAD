@@ -339,7 +339,7 @@ begin
 		mac_count			:= 0;
 		wc_to_wait_length	:= 0;
 		wc_to_wait_msg		:= 0;
-		encrypt_decrypt		:= 0;
+		encrypt_decrypt		:= '0';
 	elsif(rising_edge(clock)) then
 		case (state) is
 ----------------OFF STATE------------------------------------------------------------------------------
@@ -386,7 +386,7 @@ begin
 				mac_count			:= 0;
 				wc_to_wait_length	:= 0;
 				wc_to_wait_msg		:= 0;
-				encrypt_decrypt		:= 0;
+				encrypt_decrypt		:= '0';
                 ----------------------------------
 			    if(enable = '1') then
 			    	state <= WAIT_CW;
@@ -1259,7 +1259,7 @@ begin
 				end if;
 
             WHEN WAIT_LATCH_GET_MAC =>
-                if(completed_c = '1') then;
+                if(completed_c = '1') then
                     TAG((15+(16*mac_count)) downto (16*mac_count)) <= data_16_out_c;
                     state <= GET_MAC;
 					mac_count := mac_count + 1;
