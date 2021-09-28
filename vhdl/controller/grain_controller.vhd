@@ -236,8 +236,8 @@ signal NEXT_Z_reg		 :  std_logic;
 --Memories
 type memory_128 is array (7 downto 0) of std_logic_vector(15 downto 0);
 type memory_64 is array (3 downto 0) of std_logic_vector(15 downto 0);
-type memory_ad is array (18 downto 0) of std_logic_vector(7 downto 0);
-type memory_msg is array (114 downto 0) of std_logic_vector(7 downto 0);
+type memory_ad is array (9 downto 0) of std_logic_vector(7 downto 0);
+type memory_msg is array (31 downto 0) of std_logic_vector(7 downto 0);
 --REGS
 signal CW      		 	: std_logic_vector(15  downto 0);
 
