@@ -67,11 +67,11 @@ int main(){
     for(size_t count = 0; count < (MSG_SIZE+8); count++)
         printf("%02x", ct[count]);
     printf("\n");
-
-    decrypt_message(key, nonce, ct, ad, msg_decrypted);
+*/
+    //decrypt_message(key, nonce, ct, ad, msg_decrypted);
 
     //Decrypt
-    printf("\nMessage Decrypted: 0x");
+    /*printf("\nMessage Decrypted: 0x");
     for(size_t count = 0; count < (MSG_SIZE); count++)
         printf("%02x", msg_decrypted[count]);
     printf("\n"); */
