@@ -365,7 +365,9 @@ void encrypt_message(unsigned char key[16], unsigned char iv[12],
 					auth_shift(z_next);
 				}
 			}
+
 			ciphertext[k] = swapsb(cc);
+			
 		}
 
 		//SR 
@@ -410,8 +412,8 @@ void encrypt_message(unsigned char key[16], unsigned char iv[12],
 				acc |= grain.auth_acc[8 * acc_idx + j] << (7 - j);
 			}
 			ciphertext[i] = swapsb(acc);
-			acc_idx++;
 			printf("%02x", ciphertext[i]);
+			acc_idx++;
 		}
 		printf("\n");
 
@@ -581,6 +583,5 @@ int decrypt_message(unsigned char key[16], unsigned char iv[12],
 			return -1;
 		}
 	}
-	printf("AUTHENTICATED!\n");
 	return 0;
 }
