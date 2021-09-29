@@ -34,6 +34,33 @@ end grain_controller;
 
 architecture Behavioral of grain_controller is
 
+-- UTILITY FUNCTION
+function next_lfsr_fb(lfsr : std_logic_vector(127 downto 0)) return std_logic is
+begin
+    --return (lfsr(96) xor lfsr(81) xor lfsr(70) xor lfsr(38) xor lfsr(7) xor lfsr(0));  127-
+    return (lfsr(31) xor lfsr(46) xor lfsr(57) xor lfsr(89) xor lfsr(120) xor lfsr(127));
+end next_lfsr_fb;
+
+function next_nfsr_fb(nfsr : std_logic_vector(127 downto 0)) return std_logic is
+begin
+    return (nfsr(127-96) xor nfsr(127-91) xor nfsr(127-56) xor nfsr(127-26) xor nfsr(127-0) xor (nfsr(127-84) and nfsr(127-68)) xor
+			(nfsr(127-67) and nfsr(127-3)) xor (nfsr(127-65) and nfsr(127-61)) xor (nfsr(127-59) and nfsr(127-27)) xor
+			(nfsr(127-48) and nfsr(127-40)) xor (nfsr(127-18) and nfsr(127-17)) xor (nfsr(127-13) and nfsr(127-11)) xor
+			(nfsr(127-82) and nfsr(127-78) and nfsr(127-70)) xor (nfsr(127-25) and nfsr(127-24) and nfsr(127-22)) xor
+			(nfsr(127-95) and nfsr(127-93) and nfsr(127-92) and nfsr(127-88)));
+end next_nfsr_fb;
+
+function next_h(lfsr, nfsr : std_logic_vector(127 downto 0)) return std_logic is
+begin
+    return ((nfsr(127-12) and lfsr(127-8)) xor (lfsr(127-13) and lfsr(127-20)) xor (nfsr(127-95) and lfsr(127-42)) xor (lfsr(127-60) and lfsr(127-79)) xor
+            (nfsr(127-12) and nfsr(127-95) and lfsr(127-94)));
+end next_h;
+
+function nfsr_tmp(nfsr: std_logic_vector(127 downto 0)) return std_logic is
+begin
+    return (nfsr(127-2) xor nfsr(127-15) xor nfsr(127-36) xor nfsr(127-45) xor nfsr(127-64) xor nfsr(127-73) xor nfsr(127-89));
+end nfsr_tmp;
+
 --Swap the significant bits in a single byte
 function swapsb(byte : std_logic_vector(7 downto 0)) return std_logic_vector is
 variable return_vector : std_logic_vector(7 downto 0);
@@ -1281,10 +1308,10 @@ begin
                 
  ---------------COMPARE MAC------------------------------------
             WHEN COMPARE_MAC =>
-                if(TAG(15 downto 0) = MSG(to_integer(unsigned(lenght_submsg)) + 4)) then  --
-                    if(TAG(31 downto 16) = MSG(to_integer(unsigned(lenght_submsg)) + 5)) then
-                        if(TAG(47 downto 32) = MSG(to_integer(unsigned(lenght_submsg)) + 6)) then
-                            if(TAG(63 downto 48) = MSG(to_integer(unsigned(lenght_submsg)) + 7)) then
+                if(TAG(15 downto 0) =( (MSG(to_integer(unsigned(lenght_submsg)) + 4)) & MSG(to_integer(unsigned(lenght_submsg)) + 5)))then  --
+                    if(TAG(31 downto 16) = ( (MSG(to_integer(unsigned(lenght_submsg)) + 6)) & MSG(to_integer(unsigned(lenght_submsg)) + 7)))then
+                        if(TAG(47 downto 32) = ( (MSG(to_integer(unsigned(lenght_submsg)) + 8)) & MSG(to_integer(unsigned(lenght_submsg)) + 9)))then
+                            if(TAG(63 downto 48) = ( (MSG(to_integer(unsigned(lenght_submsg)) + 10)) & MSG(to_integer(unsigned(lenght_submsg)) + 11)))then
                                 --do nothing, authenticated :)
                             else 
                                 TAG <=(others=>'0');
@@ -1310,7 +1337,7 @@ begin
 			WHEN WRITE_CT =>
 				if(completed_c = '1') then
 					if(to_integer(unsigned(crypt_count)) < to_integer(unsigned(lenght_submsg))) then
-						data_out <= swapsb(ct(to_integer(unsigned(crypt_count)))(15 downto 8)) & swapsb(ct(to_integer(unsigned(crypt_count)))(7 downto 0)); 
+						data_out <= swapsb(ct(to_integer(unsigned(crypt_count))+ 1)) & swapsb(ct(to_integer(unsigned(crypt_count)))); 
 						buffer_enable <= '1';
 						address <= std_logic_vector(to_unsigned(to_integer(unsigned(crypt_count))/2 + to_integer(unsigned(msg_address_decode)), ADD_WIDTH));
 						rw <= '1';
@@ -1329,7 +1356,7 @@ begin
                 
 			WHEN WAIT_WRITE_CT =>
 				if(enable = '1') then
-					data_out <= swapsb(ct(to_integer(unsigned(crypt_count)))(15 downto 8)) & swapsb(ct(to_integer(unsigned(crypt_count)))(7 downto 0));
+					data_out <= swapsb(ct(to_integer(unsigned(crypt_count))+ 1)) & swapsb(ct(to_integer(unsigned(crypt_count))));
 					buffer_enable <= '1';
 					address <= std_logic_vector(to_unsigned(to_integer(unsigned(crypt_count))/2 + to_integer(unsigned(msg_address_decode)), ADD_WIDTH));
 					rw <= '1';
