@@ -319,48 +319,48 @@ begin
 		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_ACK & "0000001");
 		
 		
---		--Decrypt the second message
---		write("000000", "100011" & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); 
+		--Decrypt the second message
+		write("000000", "100011" & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); 
 		
 	
---		--Length ct || CT = 0x08 
---		write("000001", x"0800");
---		--AD
---		--CT : 475f cba7 b196 81db 31e4 dcfe abe4 d624
---        write("000010", x"3122"); --2
---		write("000011", x"3f3a"); --3
---		write("000100", x"8b4a"); --4
---		write("000101", x"e195"); --5
---		--MAC
---		write("000110", x"5baa"); --6
---		write("000111", x"1a38"); --7
---		write("001000", x"2305"); --8
---		write("001001", x"4caa"); --9
+		--Length ct || CT = 0x08 
+		write("000001", x"0800");
+		--AD
+		--CT : 475f cba7 b196 81db 31e4 dcfe abe4 d624
+       write("000010", x"3122"); --2
+		write("000011", x"3f3a"); --3
+		write("000100", x"8b4a"); --4
+		write("000101", x"e195"); --5
+		--MAC
+		write("000110", x"5baa"); --6
+		write("000111", x"1a38"); --7
+		write("001000", x"2305"); --8
+		write("001001", x"4caa"); --9
 		
---		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_INTMODE & "0000001");
+		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_INTMODE & "0000001");
 		
---		wait until rising_edge(interrupt);
---		wait until rising_edge(hclk); -- ISR is called syncronously
---		report "ho letto l'interrupt";
+		wait until rising_edge(interrupt);
+		wait until rising_edge(hclk); -- ISR is called syncronously
+		report "ho letto l'interrupt";
 		
---		read("000000");
---		write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_ACK & "0000001");
+		read("000000");
+		write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_ACK & "0000001");
 		
---		---- let the core necessary time for writing outputs and then read
---		wait for 60*HCLK_PERIOD;
+		---- let the core necessary time for writing outputs and then read
+		wait for 60*HCLK_PERIOD;
 		
---		--MSG
---		read("000010"); --2
---		read("000011"); --3
---		read("000100"); --4
---		read("000101"); --5
---		--MAC
---		read("000110"); --6
---		read("000111"); --7
---		read("001000"); --8
---		read("001001"); --9
+		--MSG
+		read("000010"); --2
+		read("000011"); --3
+		read("000100"); --4
+		read("000101"); --5
+		--MAC
+		read("000110"); --6
+		read("000111"); --7
+		read("001000"); --8
+		read("001001"); --9
 		
---		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_ACK & "0000001");		
+		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_ACK & "0000001");		
 ------------------------------------------------------------------------------------------------------------
 	wait;
 	end process stimuli;

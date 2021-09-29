@@ -327,6 +327,7 @@ void encrypt_message(unsigned char key[16], unsigned char iv[12],
 
 		for (i = 0; i < MSG_SIZE; i++) {
 			msg_swb[i] = swapsb(message[i + MSG_SIZE*packets]);
+			printf("%02x ", msg_swb[i]);
 		}
 		
 
@@ -355,6 +356,7 @@ void encrypt_message(unsigned char key[16], unsigned char iv[12],
 					//generate_keystream
 					// transform it back to 8 bits per byte
 					cc |= (message_bit[m_cnt] ^ z_next) << (7 - (c_cnt % 8));
+					printf("msg_bit[%d]: %d\n", m_cnt, message_bit[m_cnt]);
 					m_cnt++;
 					c_cnt++;
 				} else {
@@ -365,7 +367,7 @@ void encrypt_message(unsigned char key[16], unsigned char iv[12],
 					auth_shift(z_next);
 				}
 			}
-
+			printf("\n");
 			ciphertext[k] = swapsb(cc);
 			
 		}
@@ -419,7 +421,7 @@ void encrypt_message(unsigned char key[16], unsigned char iv[12],
 
 		printf("Ciphertext: 0x");
 		for(size_t count = 0; count < (MSG_SIZE+8); count++)
-			printf("%02x", ciphertext[count]);
+			printf("%02x ", ciphertext[count]);
 		printf("\n");
 
 		
