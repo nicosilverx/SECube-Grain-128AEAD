@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------------------
--- Created by: GIUSEPPE CARRUBBA / NICOLÓ BIANCO
+-- Created by: GIUSEPPE CARRUBBA / NICOLï¿½ BIANCO
 -- Create Date: 23.09.2021
 -- Module Name: TB_controller
 -- Project Name: Lightweight cipher
@@ -157,7 +157,108 @@ begin
 		
 --		--Init, encrypt 0
 		
-		write("000000", "100000" & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); 
+-- 		write("000000", "100000" & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); 
+-- 		--Key (not swapped)
+-- 		write("000001", x"def0"); --1
+-- 		write("000010", x"9abc"); --2
+-- 		write("000011", x"5678"); --3
+-- 		write("000100", x"1234"); --4
+-- 		write("000101", x"cdef"); --5
+-- 		write("000110", x"89ab"); --6
+-- 		write("000111", x"4567"); --7
+-- 		write("001000", x"0123"); --8
+-- 		--IV (not swapped)
+-- 		write("001001", x"5678"); --9
+-- 		write("001010", x"1234"); --10
+-- 		write("001011", x"cdef"); --11
+-- 		write("001100", x"89ab"); --12
+-- 		write("001101", x"4567"); --13
+-- 		write("001110", x"0123"); --14
+-- 		--Length msg || AD = 0x08 || 0x02 
+-- 		write("010001", x"0802"); --17
+-- 		--AD
+-- 		write("010010", x"1111"); --18
+-- 		--write("010011", x"1111"); --18
+-- 		--Padding for AD
+		
+		
+-- 		--MSG
+-- 		write("011100", x"2121"); --28
+-- 		write("011101", x"6e65"); --29
+-- 		write("011110", x"616f"); --30
+-- 		write("011111", x"6369"); --31
+-- 		--Padding for MSG
+		
+--         write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_INTMODE & "0000001");
+		
+-- 		wait until rising_edge(interrupt);
+-- 		wait until rising_edge(hclk); -- ISR is called syncronously
+-- 		report "ho letto l'interrupt";
+		
+-- 		read("000000");
+-- 		write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_ACK & "0000001");
+
+-- 		---- let the core necessary time for writing outputs and then read
+-- 		wait for 60*HCLK_PERIOD;
+		
+-- 		--CT
+-- 		read("011100"); --28
+-- 		read("011101"); --29
+-- 		read("011110"); --30
+-- 		read("011111"); --31
+-- 		--MAC
+-- 		read("100000"); --32
+-- 		read("100001"); --33
+-- 		read("100010"); --34
+-- 		read("100011"); --35
+		
+-- 		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_ACK & "0000001");
+		
+-- --		--
+-- --		--
+-- --		--    Encrypt 1, second part of the message
+-- --		--
+-- --		--
+		
+-- 		write("000000", "100001" & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); 
+-- 		--Length msg || AD = 0x08 || 0x02 
+-- 		write("000001", x"0800"); --1
+-- 		--MSG
+-- 		write("000010", x"2121"); --2
+-- 		write("000011", x"6e65"); --3
+-- 		write("000100", x"616f"); --4
+-- 		write("000101", x"6369"); --5
+-- 		--Padding for MSG
+		
+--         write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_INTMODE & "0000001");
+		
+-- 		wait until rising_edge(interrupt);
+-- 		wait until rising_edge(hclk); -- ISR is called syncronously
+-- 		report "ho letto l'interrupt";
+		
+-- 		read("000000");
+-- 		write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_ACK & "0000001");
+
+-- 		---- let the core necessary time for writing outputs and then read
+-- 		wait for 60*HCLK_PERIOD;
+		
+-- 		--CT
+-- 		read("000010"); --2
+-- 		read("000011"); --3
+-- 		read("000100"); --4
+-- 		read("000101"); --5
+-- 		--MAC
+-- 		read("000110"); --6
+-- 		read("000111"); --7
+-- 		read("001000"); --8
+-- 		read("001001"); --9
+		
+-- 		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_ACK & "0000001");
+
+--------------------------------------------------------------------------------------------------------------------------		
+-- 		Decrypt, init
+		write("000000", "100010" & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); 
+		
 		--Key (not swapped)
 		write("000001", x"def0"); --1
 		write("000010", x"9abc"); --2
@@ -174,22 +275,25 @@ begin
 		write("001100", x"89ab"); --12
 		write("001101", x"4567"); --13
 		write("001110", x"0123"); --14
-		--Length msg || AD = 0x08 || 0x02 
-		write("010001", x"0802"); --17
+		                          --15
+		--Two of padding          -16
+		
+		--Length ct || AD = 0x08 || 0x02 
+		write("010001", x"0802");
 		--AD
 		write("010010", x"1111"); --18
-		--write("010011", x"1111"); --18
-		--Padding for AD
+		--CT : 475f cba7 b196 81db 31e4 dcfe abe4 d624
+        write("011100", x"81db"); --28
+		write("011101", x"b196"); --29
+		write("011110", x"cba7"); --30
+		write("011111", x"475f"); --31
+		--MAC
+		write("100000", x"d624"); --32
+		write("100001", x"abe4"); --33
+		write("100010", x"dcfe"); --34
+		write("100011", x"31e4"); --35
 		
-		
-		--MSG
-		write("011100", x"2121"); --28
-		write("011101", x"6e65"); --29
-		write("011110", x"616f"); --30
-		write("011111", x"6369"); --31
-		--Padding for MSG
-		
-        write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_INTMODE & "0000001");
+		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_INTMODE & "0000001");
 		
 		wait until rising_edge(interrupt);
 		wait until rising_edge(hclk); -- ISR is called syncronously
@@ -197,11 +301,11 @@ begin
 		
 		read("000000");
 		write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_ACK & "0000001");
-
+		
 		---- let the core necessary time for writing outputs and then read
 		wait for 60*HCLK_PERIOD;
 		
-		--CT
+		--MSG
 		read("011100"); --28
 		read("011101"); --29
 		read("011110"); --30
@@ -213,110 +317,6 @@ begin
 		read("100011"); --35
 		
 		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_ACK & "0000001");
-		
---		--
---		--
---		--    Encrypt 1, second part of the message
---		--
---		--
-		
-		write("000000", "100001" & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); 
-		--Length msg || AD = 0x08 || 0x02 
-		write("000001", x"0800"); --1
-		--MSG
-		write("000010", x"2121"); --2
-		write("000011", x"6e65"); --3
-		write("000100", x"616f"); --4
-		write("000101", x"6369"); --5
-		--Padding for MSG
-		
-        write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_INTMODE & "0000001");
-		
-		wait until rising_edge(interrupt);
-		wait until rising_edge(hclk); -- ISR is called syncronously
-		report "ho letto l'interrupt";
-		
-		read("000000");
-		write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_ACK & "0000001");
-
-		---- let the core necessary time for writing outputs and then read
-		wait for 60*HCLK_PERIOD;
-		
-		--CT
-		read("000010"); --2
-		read("000011"); --3
-		read("000100"); --4
-		read("000101"); --5
-		--MAC
-		read("000110"); --6
-		read("000111"); --7
-		read("001000"); --8
-		read("001001"); --9
-		
-		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_ACK & "0000001");
-
-----------------------------------------------------------------------------------------------------------------------------		
-		--Decrypt, init
---		write("000000", "100010" & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); 
-		
---		--Key (not swapped)
---		write("000001", x"def0"); --1
---		write("000010", x"9abc"); --2
---		write("000011", x"5678"); --3
---		write("000100", x"1234"); --4
---		write("000101", x"cdef"); --5
---		write("000110", x"89ab"); --6
---		write("000111", x"4567"); --7
---		write("001000", x"0123"); --8
---		--IV (not swapped)
---		write("001001", x"5678"); --9
---		write("001010", x"1234"); --10
---		write("001011", x"cdef"); --11
---		write("001100", x"89ab"); --12
---		write("001101", x"4567"); --13
---		write("001110", x"0123"); --14
---		                          --15
---		--Two of padding          -16
-		
---		--Length ct || AD = 0x08 || 0x02 
---		write("010001", x"0802");
---		--AD
---		write("010010", x"1111"); --18
---		--CT : 475f cba7 b196 81db 31e4 dcfe abe4 d624
---        write("011100", x"81db"); --28
---		write("011101", x"b196"); --29
---		write("011110", x"cba7"); --30
---		write("011111", x"475f"); --31
---		--MAC
---		write("100000", x"d624"); --32
---		write("100001", x"abe4"); --33
---		write("100010", x"dcfe"); --34
---		write("100011", x"31e4"); --35
-		
---		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_INTMODE & "0000001");
-		
---		wait until rising_edge(interrupt);
---		wait until rising_edge(hclk); -- ISR is called syncronously
---		report "ho letto l'interrupt";
-		
---		read("000000");
---		write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_ACK & "0000001");
-		
---		---- let the core necessary time for writing outputs and then read
---		wait for 60*HCLK_PERIOD;
-		
---		--MSG
---		read("011100"); --28
---		read("011101"); --29
---		read("011110"); --30
---		read("011111"); --31
---		--MAC
---		read("100000"); --32
---		read("100001"); --33
---		read("100010"); --34
---		read("100011"); --35
-		
---		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_ACK & "0000001");
 		
 		
 --		--Decrypt the second message

@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------------------
--- Created by: GIUSEPPE CARRUBBA / NICOL� BIANCO
+-- Created by: GIUSEPPE CARRUBBA / NICOLï¿½ BIANCO
 -- Create Date: 12.09.2021
 -- Module Name: grain_controller
 -- Project Name: Lightweight cipher
@@ -150,6 +150,7 @@ type statetype is (OFF,
 				   OP_CIPHER_NEXT_Z,
 				   WAIT_CIPHER_NEXT_Z,
 				   WAIT_LATCH_CIPHER_NEXT_Z,
+				   WAIT_LATCH_RAM_ENCRYPT,
 				   
 				   CIPHER_ACCUMULATE,
 				   OP_CIPHER_ACCUMULATE,
@@ -165,6 +166,7 @@ type statetype is (OFF,
 				   OP_CIPHER_NEXT_Z_1_DECRYPT,
 				   WAIT_LATCH_CIPHER_NEXT_Z_1_DECRYPT,
 				   WAIT_CIPHER_NEXT_Z_1_DECRYPT,
+				   WAIT_LATCH_RAM_DECRYPT,
 				   
 				   
 				   CIPHER_NEXT_Z_2_DECRYPT,
@@ -347,6 +349,7 @@ variable mac_count			  : std_logic_vector(7 downto 0) := (others=>'0'); 	--Itera
 variable wc_to_wait_length    : std_logic_vector(7 downto 0) := (others=>'0');	--# of write_completed before reading the lenght word
 variable wc_to_wait_msg       : std_logic_vector(7 downto 0) := (others=>'0');	--# of write_completed before reading the msg words
 variable encrypt_decrypt      : std_logic := '0';								--0 if encrypt, 1 if decrypt
+variable next_z_addressing    : std_logic_vector(9 downto 0);
 
 variable debug : std_logic_vector(0 downto 0);
 begin
@@ -374,6 +377,7 @@ begin
 		--MSG 		      	<= (others => (others => '0'));
 		--CT 		      		<= (others => (others => '0'));
 		TAG 		  		<= (others => '0');
+		mac_from_message 	<= (others => '0');
 		key_count 			:= (others => '0');
 		iv_count 			:= (others => '0');
 		ad_count 			:= (others => '0');
@@ -388,6 +392,7 @@ begin
 		mac_count			:= (others => '0');
 		wc_to_wait_length	:= (others => '0');
 		wc_to_wait_msg		:= (others => '0');
+		
 		encrypt_decrypt		:= '0';
 	elsif(rising_edge(clock)) then
 		WE_s <= '0';
@@ -419,8 +424,9 @@ begin
 				lenght_AD     		<= (others => '0');
 				AD 		      		<= (others => (others => '0'));
 				--MSG 		      	<= (others => (others => '0'));
-				--CT 		      		<= (others => (others => '0'));
+				CT 		      		<= (others => (others => '0'));
 				TAG 		  		<= (others => '0');
+				mac_from_message 	<= (others => '0');
 				key_count 			:= (others => '0');
 				iv_count 			:= (others => '0');
 				ad_count 			:= (others => '0');
@@ -1087,25 +1093,31 @@ begin
 			WHEN WAIT_LATCH_CIPHER_NEXT_Z =>
                 if(completed_c = '1') then
                     NEXT_Z_reg <= serial_data_out_c;
-                    state <= CIPHER_ACCUMULATE;
+                    state <= WAIT_LATCH_RAM_ENCRYPT;
 					
-					Address_s <= std_logic_vector(unsigned(lenght_submsg) - 1 - unsigned(MSG_count(6 downto 3)));
+					next_z_addressing := std_logic_vector("00"&(unsigned(lenght_submsg)/2) - 1 - unsigned(MSG_count(7 downto 4)));
+					Address_s <= next_z_addressing(3 downto 0);
+					
 					
                 else
                     state <= WAIT_LATCH_CIPHER_NEXT_Z;
                 end if;
 				
+			WHEN WAIT_LATCH_RAM_ENCRYPT =>
+				state <= CIPHER_ACCUMULATE;
 			
 
 			WHEN CIPHER_ACCUMULATE =>
 				if(completed_c = '1') then
 					if((to_integer(Unsigned(crypt_count)) mod 2) = 0) then
-						CT(((to_integer(unsigned(lenght_submsg))) - 1 - to_integer(unsigned(msg_count))/8 ))(7 - to_integer(unsigned(msg_count))mod 8) <= Q_s(7 -to_integer(unsigned(msg_count))mod 8) xor NEXT_Z_reg;
-					
+						CT(((to_integer(unsigned(lenght_submsg))) - 1 - to_integer(unsigned(msg_count))/8 ))(7 - to_integer(unsigned(msg_count))mod 8) <= Q_s(15 -to_integer(unsigned(msg_count))mod 16) xor NEXT_Z_reg;
+						--debug(0) := Q_s(15 -to_integer(unsigned(msg_count))mod 16);
+						--report "msg: " & integer'image(to_integer(unsigned(debug)));
+						--report "Q_s: " & to_hstring(q_s) & " @: " & to_hstring(next_z_addressing); 
 						msg_count := std_logic_vector(unsigned(msg_count) + to_unsigned(1, 10));
 						state <= WAIT_CIPHER_LOAD_SR;
 					else
-						if(Q_s(7 -to_integer(unsigned(ac_count))mod 8) = '1') then 
+						if(Q_s(15 -to_integer(unsigned(ac_count))mod 16) = '1') then 
 							operation_c <= ACCUMULATE;
 							start_c <= '1';
 							state <= OP_CIPHER_ACCUMULATE;
@@ -1184,18 +1196,24 @@ begin
 			WHEN WAIT_LATCH_CIPHER_NEXT_Z_1_DECRYPT =>
 			     if(completed_c = '1') then
                     NEXT_Z_reg <= serial_data_out_c;
-                    state <= CIPHER_NEXT_Z_2_DECRYPT;
+                    state <= WAIT_LATCH_RAM_DECRYPT;
                  else
                     state <= WAIT_LATCH_CIPHER_NEXT_Z_1_DECRYPT;
-					 Address_s <= std_logic_vector(unsigned(lenght_submsg) - 1 - unsigned(ac_count(6 downto 3)));
+					
+					 next_z_addressing := std_logic_vector("00"&(unsigned(lenght_submsg)/2) - 1 - unsigned(ac_count(7 downto 4)));
+					 Address_s <= next_z_addressing(3 downto 0);
+						
+					 --Address_s <= std_logic_vector(unsigned(lenght_submsg) - 1 - unsigned(ac_count(7 downto 4)));
 					 
                  end if; 
 			
+			WHEN WAIT_LATCH_RAM_DECRYPT =>
+				state <= CIPHER_NEXT_Z_2_DECRYPT;
 			
 			WHEN CIPHER_NEXT_Z_2_DECRYPT =>
 			     if(completed_c = '1') then
 			            --CT(to_integer(unsigned(lenght_submsg))*8 - 1 - ac_count) <= MSG(to_integer(unsigned(lenght_submsg))*8 - 1 - ac_count) xor NEXT_Z_reg;
-						CT(((to_integer(unsigned(lenght_submsg))) - 1 - to_integer(unsigned(ac_count))/8 ))(7 - to_integer(unsigned(ac_count))mod 8) <= Q_s(7 -to_integer(unsigned(ac_count))mod 8) xor NEXT_Z_reg;
+						CT(((to_integer(unsigned(lenght_submsg))) - 1 - to_integer(unsigned(ac_count))/8 ))(7 - to_integer(unsigned(ac_count))mod 8) <= Q_s(15 -to_integer(unsigned(ac_count))mod 16) xor NEXT_Z_reg;
 						start_c <= '1';
 						operation_c <= NEXT_Z;
 						grain_round_c <= NORMAL;
@@ -1305,7 +1323,8 @@ begin
 				start_c <= '0';
 				if(busy_c = '1') then
 					state <= WAIT_USELESS_ACCUMULATE;
-				else 
+				else
+					
 					state <= GET_MAC;
 				end if;
 ----------------------GET THE MAC FROM THE CIPHER--------------------------------------------------------
@@ -1316,8 +1335,8 @@ begin
 						data_16_addr_in_c <= std_logic_vector(to_unsigned(to_integer(unsigned(mac_count)), 3));
 						start_c <= '1';
 						state <= OP_GET_MAC;
-						mac_from_message(15+(16*to_integer(unsigned(mac_count))) downto 16*to_integer(unsigned(mac_count))) <= Q_s;
-						--mac_from_message(15+(16*to_integer(unsigned(mac_count)) downto (16*to_integer(unsigned(mac_count)))) <= Q_s;
+						Address_s <= std_logic_vector(to_unsigned(to_integer((unsigned(lenght_submsg))/2) + to_integer(unsigned(mac_count)), 4));
+						report "address " & to_hstring(std_logic_vector(to_unsigned(to_integer((unsigned(lenght_submsg))/2) + to_integer(unsigned(mac_count)), 4)));
 					else    
 						mac_count := std_logic_vector(to_unsigned(0, 8));
 						if(encrypt_decrypt = '0') then
@@ -1331,6 +1350,8 @@ begin
 				end if;
              
             WHEN OP_GET_MAC =>
+				mac_from_message(15+(16*to_integer(unsigned(mac_count))) downto 16*to_integer(unsigned(mac_count))) <= Q_s;
+				report "Q_s: " & to_hstring(Q_s);
                 state <= WAIT_GET_MAC;
                 
 			WHEN WAIT_GET_MAC =>
@@ -1345,8 +1366,8 @@ begin
                 if(completed_c = '1') then
                     TAG((15+(16*to_integer(unsigned(mac_count)))) downto (16*to_integer(unsigned(mac_count)))) <= data_16_out_c;
                     state <= GET_MAC;
+					
 					 
-					 Address_s <= std_logic_vector(unsigned(lenght_submsg) + unsigned(mac_count));
 					 
 					 mac_count := std_logic_vector(unsigned(mac_count) + to_unsigned(1, 8));
                 else
@@ -1355,6 +1376,7 @@ begin
                 
  ---------------COMPARE MAC------------------------------------
             WHEN COMPARE_MAC =>
+				
                 if(TAG = MAC_from_message)then
 					-- authenticated
 				 else
