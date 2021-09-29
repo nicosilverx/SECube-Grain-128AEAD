@@ -34,33 +34,6 @@ end grain_controller;
 
 architecture Behavioral of grain_controller is
 
--- UTILITY FUNCTION
--- function next_lfsr_fb(lfsr : std_logic_vector(127 downto 0)) return std_logic is
--- begin
---     --return (lfsr(96) xor lfsr(81) xor lfsr(70) xor lfsr(38) xor lfsr(7) xor lfsr(0));  127-
---     return (lfsr(31) xor lfsr(46) xor lfsr(57) xor lfsr(89) xor lfsr(120) xor lfsr(127));
--- end next_lfsr_fb;
-
--- function next_nfsr_fb(nfsr : std_logic_vector(127 downto 0)) return std_logic is
--- begin
---     return (nfsr(127-96) xor nfsr(127-91) xor nfsr(127-56) xor nfsr(127-26) xor nfsr(127-0) xor (nfsr(127-84) and nfsr(127-68)) xor
--- 			(nfsr(127-67) and nfsr(127-3)) xor (nfsr(127-65) and nfsr(127-61)) xor (nfsr(127-59) and nfsr(127-27)) xor
--- 			(nfsr(127-48) and nfsr(127-40)) xor (nfsr(127-18) and nfsr(127-17)) xor (nfsr(127-13) and nfsr(127-11)) xor
--- 			(nfsr(127-82) and nfsr(127-78) and nfsr(127-70)) xor (nfsr(127-25) and nfsr(127-24) and nfsr(127-22)) xor
--- 			(nfsr(127-95) and nfsr(127-93) and nfsr(127-92) and nfsr(127-88)));
--- end next_nfsr_fb;
-
--- function next_h(lfsr, nfsr : std_logic_vector(127 downto 0)) return std_logic is
--- begin
---     return ((nfsr(127-12) and lfsr(127-8)) xor (lfsr(127-13) and lfsr(127-20)) xor (nfsr(127-95) and lfsr(127-42)) xor (lfsr(127-60) and lfsr(127-79)) xor
---             (nfsr(127-12) and nfsr(127-95) and lfsr(127-94)));
--- end next_h;
-
--- function nfsr_tmp(nfsr: std_logic_vector(127 downto 0)) return std_logic is
--- begin
---     return (nfsr(127-2) xor nfsr(127-15) xor nfsr(127-36) xor nfsr(127-45) xor nfsr(127-64) xor nfsr(127-73) xor nfsr(127-89));
--- end nfsr_tmp;
-
 --Swap the significant bits in a single byte
 function swapsb(byte : std_logic_vector(7 downto 0)) return std_logic_vector is
 variable return_vector : std_logic_vector(7 downto 0);
@@ -202,6 +175,8 @@ type statetype is (OFF,
 				   UPDATE_STATE,
 				   WAIT_ACK,
 				   
+				   LOAD_CT_RAM,
+				   WAIT_LOAD_CT_RAM,
 				   WRITE_MAC,
 				   OP_WRITE_MAC,
 				   WAIT_WRITE_MAC,
@@ -264,6 +239,15 @@ signal Data_s:   std_logic_vector(15 downto 0);
 signal WE_s:   std_logic; 
 signal Q_s:   std_logic_vector(15 downto 0);
 
+--SIGNALS FOR CT_RAM
+signal reset_ct  :  std_logic;
+signal Address_ct:	std_logic_vector(3 downto 0);
+signal Data_ct:		std_logic_vector(15 downto 0);
+signal WE_ct: 		std_logic;
+signal Q_ct:		std_logic_vector(15 downto 0);
+
+signal serial_data_ct: std_logic_vector(15 downto 0);
+
 --INTERCONNECTION WITH IP_CORE
 signal data_16_in_c      :  std_logic_vector(15 downto 0);
 signal data_16_addr_in_c :  std_logic_vector(2 downto 0);
@@ -308,7 +292,7 @@ begin
 
 --RAM for MSG
 ram_msg : ram_16x16 port map(clock, '1', reset, WE_s, Address_s, Data_s, Q_s);
-
+ram_ct  : ram_16x16 port map(clock, '1', reset, WE_ct, Address_ct, Data_ct, Q_ct);
 -- Cipher core instantiation
 core: grain128_core port map (clock, rst_c, data_16_in_c, data_16_addr_in_c, serial_data_in_c, start_c,
                               operation_c, grain_round_c, data_16_out_c, serial_data_out_c,
@@ -350,6 +334,7 @@ variable wc_to_wait_length    : std_logic_vector(7 downto 0) := (others=>'0');	-
 variable wc_to_wait_msg       : std_logic_vector(7 downto 0) := (others=>'0');	--# of write_completed before reading the msg words
 variable encrypt_decrypt      : std_logic := '0';								--0 if encrypt, 1 if decrypt
 variable next_z_addressing    : std_logic_vector(9 downto 0);
+variable ct_ram_addressing	  : std_logic_vector(9 downto 0); 					--remove it if not used
 
 variable debug : std_logic_vector(0 downto 0);
 begin
@@ -378,6 +363,7 @@ begin
 		--CT 		      		<= (others => (others => '0'));
 		TAG 		  		<= (others => '0');
 		mac_from_message 	<= (others => '0');
+		serial_data_ct      <= (others => '0');
 		key_count 			:= (others => '0');
 		iv_count 			:= (others => '0');
 		ad_count 			:= (others => '0');
@@ -392,15 +378,18 @@ begin
 		mac_count			:= (others => '0');
 		wc_to_wait_length	:= (others => '0');
 		wc_to_wait_msg		:= (others => '0');
+		reset_ct 			<= '1';
 		
 		encrypt_decrypt		:= '0';
 	elsif(rising_edge(clock)) then
 		WE_s <= '0';
+		WE_ct <= '0';
 		case (state) is
 ----------------OFF STATE------------------------------------------------------------------------------
 			when OFF =>
 				--CORE SIGNALS
 				rst_c <= '0';
+				reset_ct <= '0';
 				data_16_in_c <= (others => '0');
 				data_16_addr_in_c <= (others => '0');
 				serial_data_in_c <= '0';
@@ -423,10 +412,9 @@ begin
 				lenght_submsg 		<= (others => '0');
 				lenght_AD     		<= (others => '0');
 				AD 		      		<= (others => (others => '0'));
-				--MSG 		      	<= (others => (others => '0'));
-				CT 		      		<= (others => (others => '0'));
 				TAG 		  		<= (others => '0');
 				mac_from_message 	<= (others => '0');
+				serial_data_ct      <= (others => '0');
 				key_count 			:= (others => '0');
 				iv_count 			:= (others => '0');
 				ad_count 			:= (others => '0');
@@ -441,6 +429,7 @@ begin
 				mac_count			:= (others => '0');
 				wc_to_wait_length	:= (others => '0');
 				wc_to_wait_msg		:= (others => '0');
+				
                 ----------------------------------
 			    if(enable = '1') then
 			    	state <= WAIT_CW;
@@ -467,7 +456,8 @@ begin
 			WHEN READ_CW =>
 				CW <= data_in;
 				data_out <= (others => '0');
-				buffer_enable <= '0';
+				buffer_enable <= '0
+				';
 				address <= (others => '0');
 				rw <= '0';
 				interrupt <= '0';
@@ -1110,7 +1100,8 @@ begin
 			WHEN CIPHER_ACCUMULATE =>
 				if(completed_c = '1') then
 					if((to_integer(Unsigned(crypt_count)) mod 2) = 0) then
-						CT(((to_integer(unsigned(lenght_submsg))) - 1 - to_integer(unsigned(msg_count))/8 ))(7 - to_integer(unsigned(msg_count))mod 8) <= Q_s(15 -to_integer(unsigned(msg_count))mod 16) xor NEXT_Z_reg;
+						serial_data_ct((15 - to_integer(unsigned(ac_count))mod 16)) <= Q_s(15 -to_integer(unsigned(msg_count))mod 16) xor NEXT_Z_reg;
+						--CT(((to_integer(unsigned(lenght_submsg))) - 1 - to_integer(unsigned(msg_count))/8 ))(7 - to_integer(unsigned(msg_count))mod 8) <= Q_s(15 -to_integer(unsigned(msg_count))mod 16) xor NEXT_Z_reg;
 						--debug(0) := Q_s(15 -to_integer(unsigned(msg_count))mod 16);
 						--report "msg: " & integer'image(to_integer(unsigned(debug)));
 						--report "Q_s: " & to_hstring(q_s) & " @: " & to_hstring(next_z_addressing); 
@@ -1125,6 +1116,14 @@ begin
 						    state <= CIPHER_LOAD_SR; 
 						end if;
 						ac_count := std_logic_vector(unsigned(ac_count) + to_unsigned(1, 10));
+
+						if( (to_integer(unsigned(ac_count)) mod 16) = 0 and (to_integer(unsigned(ac_count)))  > 0) then
+								WE_ct <= '1';
+								ct_ram_addressing := std_logic_vector("00"&(unsigned(lenght_submsg)/2) - 1 - unsigned(MSG_count(7 downto 4)));
+								address_ct <= ct_ram_addressing(3 downto 0);
+								data_ct <= serial_data_ct;
+						end if;
+
 					end if;
 				else
 					state <= CIPHER_ACCUMULATE;
@@ -1213,7 +1212,8 @@ begin
 			WHEN CIPHER_NEXT_Z_2_DECRYPT =>
 			     if(completed_c = '1') then
 			            --CT(to_integer(unsigned(lenght_submsg))*8 - 1 - ac_count) <= MSG(to_integer(unsigned(lenght_submsg))*8 - 1 - ac_count) xor NEXT_Z_reg;
-						CT(((to_integer(unsigned(lenght_submsg))) - 1 - to_integer(unsigned(ac_count))/8 ))(7 - to_integer(unsigned(ac_count))mod 8) <= Q_s(15 -to_integer(unsigned(ac_count))mod 16) xor NEXT_Z_reg;
+						--CT(((to_integer(unsigned(lenght_submsg))) - 1 - to_integer(unsigned(ac_count))/8 ))(7 - to_integer(unsigned(ac_count))mod 8) <= Q_s(15 -to_integer(unsigned(ac_count))mod 16) xor NEXT_Z_reg;
+						serial_data_ct((15 - to_integer(unsigned(ac_count))mod 16)) <= Q_s(15 -to_integer(unsigned(msg_count))mod 16) xor NEXT_Z_reg;
 						start_c <= '1';
 						operation_c <= NEXT_Z;
 						grain_round_c <= NORMAL;
@@ -1237,7 +1237,8 @@ begin
 			WHEN WAIT_LATCH_CIPHER_NEXT_Z_2_DECRYPT =>
 			      if(completed_c = '1') then
                     NEXT_Z_reg <= serial_data_out_c;
-                    if(CT(((to_integer(unsigned(lenght_submsg))) - 1 - to_integer(unsigned(ac_count))/8 ))(7 - to_integer(unsigned(ac_count))mod 8) = '1') then
+                    if(serial_data_ct((15 - to_integer(unsigned(ac_count))mod 16)) = '1') then
+					--if(CT(((to_integer(unsigned(lenght_submsg))) - 1 - to_integer(unsigned(ac_count))/8 ))(7 - to_integer(unsigned(ac_count))mod 8) = '1') then
                         operation_c <= ACCUMULATE;
                         start_c <= '1';
                         state <= OP_CIPHER_ACCUMULATE_DECRYPT;
@@ -1281,6 +1282,13 @@ begin
 				  else
 				 	crypt_count := std_logic_vector(unsigned(crypt_count) + to_unsigned(1, 10));
 					ac_count := std_logic_vector(unsigned(ac_count) + to_unsigned(1, 10));
+					if( (to_integer(unsigned(ac_count)) mod 16) = 0 and (to_integer(unsigned(ac_count)))  > 0) then
+								WE_ct <= '1';
+								ct_ram_addressing := std_logic_vector("00"&(unsigned(lenght_submsg)/2) - 1 - unsigned(MSG_count(7 downto 4)));
+								address_ct <= ct_ram_addressing(3 downto 0);
+								data_ct <= serial_data_ct;
+					end if;
+
 					state <= CIPHER_NEXT_Z_1_DECRYPT;
 				  end if;
 			
@@ -1395,10 +1403,18 @@ begin
                     crypt_count := std_logic_vector(to_unsigned(0, 10));
                 end if;
 -----------------WRITE THE MESSAGE ENCRYPTED/DECRYPTED IN OUTPUT---------------------------------------------------
+			
+			WHEN LOAD_CT_RAM =>
+				Address_ct <= std_logic_vector(to_unsigned(to_integer(unsigned(crypt_count)), 4));
+				state <= WAIT_LOAD_CT_RAM;
+			
+			WHEN WAIT_LOAD_CT_RAM =>
+				state <= WRITE_CT;
+			
 			WHEN WRITE_CT =>
 				if(completed_c = '1') then
 					if(to_integer(unsigned(crypt_count)) < to_integer(unsigned(lenght_submsg))) then
-						data_out <= swapsb(ct(to_integer(unsigned(crypt_count))+ 1)) & swapsb(ct(to_integer(unsigned(crypt_count)))); 
+						data_out <= swapsb(Q_s(15 downto 8)) & swapsb(Q_s(7 downto 0));
 						buffer_enable <= '1';
 						address <= std_logic_vector(to_unsigned(to_integer(unsigned(crypt_count))/2 + to_integer(unsigned(msg_address_decode)), ADD_WIDTH));
 						rw <= '1';
@@ -1423,7 +1439,7 @@ begin
 					rw <= '1';
 					error <= '0';
 					crypt_count := std_logic_vector(to_unsigned(2, 10) + unsigned(crypt_count));
-					state <= WRITE_CT;
+					state <= LOAD_CT_RAM;
 				else
 					state <= WAIT_WRITE_CT;
 				end if;
