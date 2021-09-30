@@ -1,5 +1,5 @@
 ----------------------------------------------------------------------------------
--- Created by: GIUSEPPE CARRUBBA / NICOLï¿½ BIANCO
+-- Created by: GIUSEPPE CARRUBBA / NICOLÃ¯Â¿Â½ BIANCO
 -- Create Date: 12.09.2021
 -- Module Name: grain_controller
 -- Project Name: Lightweight cipher
@@ -173,7 +173,6 @@ type statetype is (OFF,
 				   COMPARE_MAC,
 				   
 				   UPDATE_STATE,
-				   WAIT_ACK,
 				   
 				   LOAD_CT_RAM,
 				   WAIT_LOAD_CT_RAM,
@@ -268,7 +267,7 @@ signal NEXT_Z_reg		 :  std_logic;
 type memory_128 is array (7 downto 0) of std_logic_vector(15 downto 0);
 type memory_64 is array (3 downto 0) of std_logic_vector(15 downto 0);
 type memory_ad is array (9 downto 0) of std_logic_vector(7 downto 0);
-type memory_msg is array (31 downto 0) of std_logic_vector(7 downto 0);
+--type memory_msg is array (31 downto 0) of std_logic_vector(7 downto 0);
 --REGS
 signal CW      		 	: std_logic_vector(15  downto 0);
 
@@ -276,7 +275,7 @@ signal iv : memory_128;
 signal key : memory_128;
 signal AD : memory_ad;
 --signal msg : memory_msg;
-signal ct : memory_msg;
+--signal ct : memory_msg;
 
 
 
@@ -456,8 +455,7 @@ begin
 			WHEN READ_CW =>
 				CW <= data_in;
 				data_out <= (others => '0');
-				buffer_enable <= '0
-				';
+				buffer_enable <= '0';
 				address <= (others => '0');
 				rw <= '0';
 				interrupt <= '0';
@@ -678,9 +676,6 @@ begin
 				Data_s <= swapsb(data_in(15 downto 8)) & swapsb(data_in(7 downto 0));
 				WE_s <= '1';
 				
-				--MSG(to_integer(unsigned(MSG_count))+1) <= swapsb(data_in(15 downto 8));
-				--MSG(to_integer(unsigned(MSG_count))) <= swapsb(data_in(7 downto 0));
-				
 		    	data_out <= (others => '0');
 		    	buffer_enable <= '0';
 		    	address <= (others => '0');
@@ -725,9 +720,6 @@ begin
 				state <= READ_MAC_DECRYPTION;
 
 			WHEN READ_MAC_DECRYPTION =>
-				--MSG((15+(16*(MSG_count+4))) downto (16*(MSG_count+4))) <= swapsb(data_in(15 downto 8)) & swapsb(data_in(7 downto 0));
-				--msg(to_integer(unsigned(MSG_COUNT)) + 8+ 1) <= swapsb(data_in(15 downto 8));
-				--msg(to_integer(unsigned(MSG_COUNT)) + 8 ) <= swapsb(data_in(7 downto 0));
 				
 				Address_s <= std_logic_vector(unsigned(MSG_count(4 downto 1)) + 4);
 				Data_s <= swapsb(data_in(15 downto 8)) & swapsb(data_in(7 downto 0));
@@ -1101,10 +1093,6 @@ begin
 				if(completed_c = '1') then
 					if((to_integer(Unsigned(crypt_count)) mod 2) = 0) then
 						serial_data_ct((15 - to_integer(unsigned(ac_count))mod 16)) <= Q_s(15 -to_integer(unsigned(msg_count))mod 16) xor NEXT_Z_reg;
-						--CT(((to_integer(unsigned(lenght_submsg))) - 1 - to_integer(unsigned(msg_count))/8 ))(7 - to_integer(unsigned(msg_count))mod 8) <= Q_s(15 -to_integer(unsigned(msg_count))mod 16) xor NEXT_Z_reg;
-						--debug(0) := Q_s(15 -to_integer(unsigned(msg_count))mod 16);
-						--report "msg: " & integer'image(to_integer(unsigned(debug)));
-						--report "Q_s: " & to_hstring(q_s) & " @: " & to_hstring(next_z_addressing); 
 						msg_count := std_logic_vector(unsigned(msg_count) + to_unsigned(1, 10));
 						state <= WAIT_CIPHER_LOAD_SR;
 					else
@@ -1119,7 +1107,7 @@ begin
 
 						if( (to_integer(unsigned(ac_count)) mod 16) = 0 and (to_integer(unsigned(ac_count)))  > 0) then
 								WE_ct <= '1';
-								ct_ram_addressing := std_logic_vector("00"&(unsigned(lenght_submsg)/2) - 1 - unsigned(MSG_count(7 downto 4)));
+								ct_ram_addressing := std_logic_vector("00"&(unsigned(lenght_submsg)/2) - unsigned(MSG_count(7 downto 4)));
 								address_ct <= ct_ram_addressing(3 downto 0);
 								data_ct <= serial_data_ct;
 						end if;
@@ -1213,7 +1201,7 @@ begin
 			     if(completed_c = '1') then
 			            --CT(to_integer(unsigned(lenght_submsg))*8 - 1 - ac_count) <= MSG(to_integer(unsigned(lenght_submsg))*8 - 1 - ac_count) xor NEXT_Z_reg;
 						--CT(((to_integer(unsigned(lenght_submsg))) - 1 - to_integer(unsigned(ac_count))/8 ))(7 - to_integer(unsigned(ac_count))mod 8) <= Q_s(15 -to_integer(unsigned(ac_count))mod 16) xor NEXT_Z_reg;
-						serial_data_ct((15 - to_integer(unsigned(ac_count))mod 16)) <= Q_s(15 -to_integer(unsigned(msg_count))mod 16) xor NEXT_Z_reg;
+						serial_data_ct((15 - to_integer(unsigned(ac_count))mod 16)) <= Q_s(15 -to_integer(unsigned(ac_count))mod 16) xor NEXT_Z_reg;
 						start_c <= '1';
 						operation_c <= NEXT_Z;
 						grain_round_c <= NORMAL;
@@ -1284,7 +1272,8 @@ begin
 					ac_count := std_logic_vector(unsigned(ac_count) + to_unsigned(1, 10));
 					if( (to_integer(unsigned(ac_count)) mod 16) = 0 and (to_integer(unsigned(ac_count)))  > 0) then
 								WE_ct <= '1';
-								ct_ram_addressing := std_logic_vector("00"&(unsigned(lenght_submsg)/2) - 1 - unsigned(MSG_count(7 downto 4)));
+								ct_ram_addressing := std_logic_vector("00"&(unsigned(lenght_submsg)/2) - unsigned(ac_count(7 downto 4)));
+								--report "ct: " & to_hstring(serial_data_ct) & "@" & to_hstring(ct_ram_addressing);
 								address_ct <= ct_ram_addressing(3 downto 0);
 								data_ct <= serial_data_ct;
 					end if;
@@ -1348,7 +1337,7 @@ begin
 					else    
 						mac_count := std_logic_vector(to_unsigned(0, 8));
 						if(encrypt_decrypt = '0') then
-						  state <= UPDATE_STATE;
+						  state <= LOAD_CT_RAM;
 						else
 						  state <= COMPARE_MAC; 
 						end if;
@@ -1384,28 +1373,17 @@ begin
                 
  ---------------COMPARE MAC------------------------------------
             WHEN COMPARE_MAC =>
-				
                 if(TAG = MAC_from_message)then
 					-- authenticated
 				 else
-					ct <= (others=>(others=>'0'));
+					reset_ct <= '1';
 				 end if;
-                state <= UPDATE_STATE;      
-----------------UPDATE STATE------------------------------------
-            when UPDATE_STATE =>
-                interrupt <= '1';
-                state 	  <= WAIT_ACK;
- 
-            when WAIT_ACK =>
-                if(enable = '1' and ack = '1') then
-                    interrupt       <= '0';
-                    state           <= WRITE_CT;
-                    crypt_count := std_logic_vector(to_unsigned(0, 10));
-                end if;
+                state <= LOAD_CT_RAM;      
+
 -----------------WRITE THE MESSAGE ENCRYPTED/DECRYPTED IN OUTPUT---------------------------------------------------
 			
 			WHEN LOAD_CT_RAM =>
-				Address_ct <= std_logic_vector(to_unsigned(to_integer(unsigned(crypt_count)), 4));
+				Address_ct <= std_logic_vector(to_unsigned(to_integer(unsigned(crypt_count))/2, 4));
 				state <= WAIT_LOAD_CT_RAM;
 			
 			WHEN WAIT_LOAD_CT_RAM =>
@@ -1414,7 +1392,10 @@ begin
 			WHEN WRITE_CT =>
 				if(completed_c = '1') then
 					if(to_integer(unsigned(crypt_count)) < to_integer(unsigned(lenght_submsg))) then
-						data_out <= swapsb(Q_s(15 downto 8)) & swapsb(Q_s(7 downto 0));
+						data_out <= swapsb(Q_ct(15 downto 8)) & swapsb(Q_ct(7 downto 0));
+						
+						--report "ct: " & to_hstring(swapsb(Q_ct(15 downto 8)) & swapsb(Q_ct(7 downto 0))) & "@" & to_hstring(Address_ct);
+						
 						buffer_enable <= '1';
 						address <= std_logic_vector(to_unsigned(to_integer(unsigned(crypt_count))/2 + to_integer(unsigned(msg_address_decode)), ADD_WIDTH));
 						rw <= '1';
@@ -1433,7 +1414,7 @@ begin
                 
 			WHEN WAIT_WRITE_CT =>
 				if(enable = '1') then
-					data_out <= swapsb(ct(to_integer(unsigned(crypt_count))+ 1)) & swapsb(ct(to_integer(unsigned(crypt_count))));
+					data_out <= swapsb(Q_ct(15 downto 8)) & swapsb(Q_ct(7 downto 0));
 					buffer_enable <= '1';
 					address <= std_logic_vector(to_unsigned(to_integer(unsigned(crypt_count))/2 + to_integer(unsigned(msg_address_decode)), ADD_WIDTH));
 					rw <= '1';
@@ -1462,7 +1443,7 @@ begin
 						state <= OP_WRITE_MAC;
 					else
 						mac_count := std_logic_vector(to_unsigned(0, 8));
-						state <= CLEAR_ALL;
+						state <= UPDATE_STATE;
 					end if;
 				else
 					state <= WRITE_MAC;
@@ -1483,6 +1464,15 @@ begin
 				else
 					state <= WAIT_WRITE_MAC;
 				end if;				
+----------------UPDATE STATE------------------------------------
+            when UPDATE_STATE =>
+				buffer_enable <= '1';
+				rw <= '1';
+				address <= std_logic_vector(to_unsigned(63, ADD_WIDTH));
+				data_out <= x"FFFF";
+				interrupt <= '0';
+				error <= '0';
+				state <= CLEAR_ALL;
 -------------------------------------------------------------------				
 			WHEN CLEAR_ALL =>
 				data_out <= (others => '0');

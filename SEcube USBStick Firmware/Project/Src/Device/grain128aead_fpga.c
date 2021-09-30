@@ -21,7 +21,7 @@ static void GRAIN128AEAD_FPGA_init_pack(FPGA_IPM_DATA *key,
 										FPGA_IPM_DATA *iv,
 										FPGA_IPM_DATA *ad, uint8_t adLen,
 										FPGA_IPM_DATA *msg, uint8_t msgLen,
-										FPGA_IPM_DATA *res, uint8_t *i_res, uint8_t readMAC)
+										FPGA_IPM_DATA *res, uint8_t *i_res, uint8_t readMAC, FPGA_IPM_OPCODE opcode)
 {
 
 	FPGA_IPM_ADDRESS add = 1;
@@ -33,7 +33,7 @@ static void GRAIN128AEAD_FPGA_init_pack(FPGA_IPM_DATA *key,
 	lengths = ( (msgLen & 0xFF ) << 8) | ( adLen & 0xFF );
 	// open a interrupt transaction
 	print_uart("Opening FPGA transaction\r\n");
-	FPGA_IPM_open(GRAIN128AEAD_FPGA_CORE, GRAIN128AEAD_FPGA_OPCODE, 1, 0);
+	FPGA_IPM_open(GRAIN128AEAD_FPGA_CORE, opcode, 1, 0);
 	// write the key onto the data buffer
 	print_uart("[WRITING data buffer] KEY\r\n");
 	for(i=0; i < GRAIN128AEAD_FPGA_WORDS_KEY; i++) {
@@ -101,7 +101,7 @@ static void GRAIN128AEAD_FPGA_init_pack(FPGA_IPM_DATA *key,
 }
 
 // POSSIBLE ERROR WHEN A TRANSACTION IS GONNA BE OPEN -> ACK_BIT = 1
-static void GRAIN128AEAD_FPGA_next_pack(FPGA_IPM_DATA *msg, uint8_t msgLen, FPGA_IPM_DATA *res, uint8_t *i_res, uint8_t readMAC)
+static void GRAIN128AEAD_FPGA_next_pack(FPGA_IPM_DATA *msg, uint8_t msgLen, FPGA_IPM_DATA *res, uint8_t *i_res, uint8_t readMAC, FPGA_IPM_OPCODE opcode)
 {
 
 	FPGA_IPM_ADDRESS add = 0x1;
@@ -112,7 +112,7 @@ static void GRAIN128AEAD_FPGA_next_pack(FPGA_IPM_DATA *msg, uint8_t msgLen, FPGA
 
 	submsglength = (msgLen << 8);
 	// open a interrupt transaction
-	FPGA_IPM_open(GRAIN128AEAD_FPGA_CORE, GRAIN128AEAD_FPGA_OPCODE, 1, 0);
+	FPGA_IPM_open(GRAIN128AEAD_FPGA_CORE, opcode, 1, 0);
 	// write msg onto the buffer
 	for(i=0; i < msgLen; i++) {
 		FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, add, &msg[i]);
@@ -146,7 +146,7 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 															uint8_t *IV,
 															uint8_t *AD, uint8_t ADlen,
 															const uint8_t *dataIN, uint64_t datainLen,
-															uint8_t *dataOUT) {
+															uint8_t *dataOUT, FPGA_IPM_OPCODE opcode) {
 
 	int i, i_datain = 0, i_res = 0;
 
@@ -205,7 +205,7 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 		GRAIN128AEAD_FPGA_init_pack(key, IV, ADblock, subADlen, dataIN, datainLen, res, &i_res, 1);
 	} else {
 		left = datainLen;
-		// This loop is in charge of create packet as soon as the remain bytes is enough to create complete packet of 58 words as message/ciphertext
+		// This loop is in charge of create packet as soon as the remain bytes is enough to create complete packet of 12 words as message/ciphertext
 		while ( left > available_dataLen ){
 			// Create packet init, just at the beginning
 			if ( i_datain == 0 ) {
@@ -218,7 +218,7 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 				// save number of words created
 				subdatainLen = GRAIN128AEAD_FPGA_WORDS_INIT_PACK;
 				// write INIT PACKET inside data buffer without getting MAC data
-				GRAIN128AEAD_FPGA_init_pack(key, IV, ADblock, subADlen, datainBlock, subdatainLen, res, &i_res, GRAIN128AEAD_FPGA_NOT_WRITE_MAC);
+				GRAIN128AEAD_FPGA_init_pack(key, IV, ADblock, subADlen, datainBlock, subdatainLen, res, &i_res, GRAIN128AEAD_FPGA_NOT_WRITE_MAC, opcode);
 				// decrement the remaining datainLen of 30 words ( 60 bytes)
 				left -= 2*GRAIN128AEAD_FPGA_WORDS_INIT_PACK;
 				available_dataLen = 2*GRAIN128AEAD_FPGA_WORDS_NEXT_PACK;
@@ -232,7 +232,7 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 				// save number of words created
 				subdatainLen = GRAIN128AEAD_FPGA_WORDS_NEXT_PACK;
 				// write NEXT PACKET inside data buffer without getting MAC data
-				GRAIN128AEAD_FPGA_next_pack(datainBlock, subdatainLen, res, &i_res, GRAIN128AEAD_FPGA_NOT_WRITE_MAC);
+				GRAIN128AEAD_FPGA_next_pack(datainBlock, subdatainLen, res, &i_res, GRAIN128AEAD_FPGA_NOT_WRITE_MAC, opcode+1);
 				// decrement the remaining datainLen of 58 words ( 116 bytes)
 				left -= 2*GRAIN128AEAD_FPGA_WORDS_NEXT_PACK;
 			}
@@ -249,9 +249,9 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 
 		subdatainLen = i;
 		if ( left == datainLen )
-			GRAIN128AEAD_FPGA_init_pack(key, IV, ADblock, subADlen, datainBlock, subdatainLen, res, &i_res, GRAIN128AEAD_FPGA_WRITE_MAC);
+			GRAIN128AEAD_FPGA_init_pack(key, IV, ADblock, subADlen, datainBlock, subdatainLen, res, &i_res, GRAIN128AEAD_FPGA_WRITE_MAC, opcode);
 		else
-			GRAIN128AEAD_FPGA_next_pack(datainBlock, subdatainLen, res, &i_res, GRAIN128AEAD_FPGA_WRITE_MAC);
+			GRAIN128AEAD_FPGA_next_pack(datainBlock, subdatainLen, res, &i_res, GRAIN128AEAD_FPGA_WRITE_MAC, opcode+1);
 	}
 
 	for(i=0; i < datainLen/2; i++) {
@@ -278,7 +278,7 @@ GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_FPGA_encrypt (
 												const uint8_t *msg, uint64_t msgLen,
 												uint8_t *ciphertext) {
 
-	return GRAIN128AEAD_CHIPHER(key, IV, AD, ADlen, msg, msgLen, ciphertext);
+	return GRAIN128AEAD_CHIPHER(key, IV, AD, ADlen, msg, msgLen, ciphertext, GRAIN128AEAD_FPGA_OPCODE_INIT_ENCRYPTION);
 
 
 }
@@ -289,6 +289,6 @@ GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_FPGA_decrypt (
 												const uint8_t *ciphertext, uint64_t cipherLen,
 												uint8_t *msg){
 
-	return GRAIN128AEAD_CHIPHER(key, IV, AD, ADlen, ciphertext, cipherLen, msg);
+	return GRAIN128AEAD_CHIPHER(key, IV, AD, ADlen, ciphertext, cipherLen, msg, GRAIN128AEAD_FPGA_OPCODE_INIT_DECRYPTION);
 
 }
