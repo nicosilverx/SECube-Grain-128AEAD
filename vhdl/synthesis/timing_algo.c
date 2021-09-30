@@ -4,10 +4,10 @@
 	Embedded Algo File.
 
 	CREATED BY: Diamond Deployment Tool 3.12
-	CREATION DATE: Thu Sep 30 00:28:55 2021
+	CREATION DATE: Thu Sep 30 14:17:46 2021
 
 	CHAIN DESCRIPTION:
-	1	LCMXO2-7000HE	FLASH Erase,Program,Verify	F:/lscc/diamond/3.12/bin/nt64/impl1/ip_example_impl1.jed
+	1	LCMXO2-7000HE	FLASH Erase,Program,Verify	F:/lscc/diamond/3.12/bin/nt64/timing/grain128_final_timing.jed
 
 	The following constant variables should be stored in external data.
 
