@@ -129,7 +129,7 @@ int main(void)
 	MX_GPIO_Init();
 	MX_DMA_Init();
 	MX_ADC1_Init();
-	MX_FMC_Init();
+	//MX_FMC_Init();
 	MX_I2C2_Init();
 	MX_SDIO_SD_Init();
 	MX_SPI5_Init();
@@ -149,22 +149,28 @@ int main(void)
 	}
 	print_uart("\r\n\r\n");
 	print_uart("Lauching FPGA inizialization");
-	for(i=0; i < 5; i++) {
+	for(i=0; i < 3; i++) {
 		print_uart("..");
 		//HAL_Delay(1000);
 	}
 	FPGA_IPM_init();
 	print_uart("\r\n\r\n");
 	print_uart("Lauching FPGA programming");
-	for(i=0; i < 5; i++) {
+	for(i=0; i < 3; i++) {
 		print_uart("..");
 		//HAL_Delay(1000);
 	}
+
 	//B5_FPGA_Programming();
+
+	HAL_GPIO_WritePin(GPIOG, FPGA_RST_Pin , GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOG, FPGA_RST_Pin , GPIO_PIN_RESET);
+
+	HAL_Delay(500);
 
 	print_uart("\r\n\r\n");
 	print_uart("Starting API testing mode");
-	for(i=0; i < 5; i++) {
+	for(i=0; i < 3; i++) {
 		print_uart("..");
 		//HAL_Delay(1000);
 	}
@@ -184,7 +190,7 @@ int main(void)
 		HAL_UART_Receive(&huart1, &cmd, 1, HAL_MAX_DELAY);
 	}
 	print_uart("Starting Encryption... \r\n");
-	test_grain128aead_encryption(2, 1);
+	test_grain128aead_encryption(4, 26);
 	print_uart("\r\n\r\n");
 //	cmd = 0;
 //	while (cmd != 'd' ){
@@ -247,12 +253,13 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 int test_grain128aead_encryption(uint8_t adLen, uint64_t msgLen) {
-	uint8_t key[16];
-	uint8_t iv[12];
-	uint8_t msg[msgLen];
-	uint8_t ad[adLen];
+	uint8_t key[16], key_32[32] ;
+	uint8_t iv[12], iv_24[24];
+	uint8_t msg[msgLen], msg_2[2*msgLen];
+	uint8_t ad[adLen], ad_2[2*adLen];
 	uint8_t res[msgLen + 8];
 	uint64_t resLen = msgLen + 8;
+	uint16_t i;
 
 	generate_rnd_vector(key, 16);
 	HAL_Delay(500);

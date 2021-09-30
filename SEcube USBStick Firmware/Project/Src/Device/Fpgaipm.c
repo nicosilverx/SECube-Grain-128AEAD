@@ -44,7 +44,8 @@ static FPGA_IPM_BOOLEAN checkCore(FPGA_IPM_CORE coreID);
 static void writeRow0(FPGA_IPM_DATA newRow0);
 static void readRow0();
 
-extern FPGA_IPM_DATA interrupt_signal;
+
+
 
 
 FPGA_IPM_BOOLEAN FPGA_IPM_init() {
@@ -343,7 +344,7 @@ void EXTI9_5_IRQHandler(void) {
     	switch(row0) {
     		case 1:
     			// insert here code for IP #1
-    			interrupt_signal = 0x0001;
+
     		default:
     			break;
     	}

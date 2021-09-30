@@ -27,6 +27,7 @@ void print_uart_int(uint8_t num) {
 	while(appo != 0 ) {
 		integer[3-i] = (appo % 10) + '0';
 		appo = appo/10;
+		i++;
 	}
 	for(i=0;i < 4; i++)
 		HAL_UART_Transmit(&huart1, &integer[i], 1, HAL_MAX_DELAY);
