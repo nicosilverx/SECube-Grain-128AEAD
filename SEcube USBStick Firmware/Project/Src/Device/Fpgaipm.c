@@ -44,7 +44,7 @@ static FPGA_IPM_BOOLEAN checkCore(FPGA_IPM_CORE coreID);
 static void writeRow0(FPGA_IPM_DATA newRow0);
 static void readRow0();
 
-FPGA_IPM_DATA interrupt_signal;
+extern FPGA_IPM_DATA interrupt_signal;
 
 
 FPGA_IPM_BOOLEAN FPGA_IPM_init() {
@@ -217,8 +217,9 @@ FPGA_IPM_BOOLEAN FPGA_IPM_init() {
 	GPIO_InitStruct.Alternate = GPIO_AF0_MCO;
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 	  
+	// put prescaler 4 to PLLCLK = 45 Mhz
 	/* Set MCO1 output = PLLCLK with prescaler 3 = 180MHz / 3 = 60MHz */
-	__HAL_RCC_MCO1_CONFIG(RCC_MCO1SOURCE_PLLCLK, RCC_MCODIV_3);
+	__HAL_RCC_MCO1_CONFIG(RCC_MCO1SOURCE_PLLCLK, RCC_MCODIV_4);
 
 	// INIT SEMAPHORE
 	sem = 1;

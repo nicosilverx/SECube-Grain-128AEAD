@@ -14,9 +14,11 @@
 
 */
 
-#define MSG_PACKETS 2
-#define MSG_SIZE 8
+#define MSG_PACKETS 1
+#define MSG_SIZE 1
 #define AD_SIZE 2
+
+
 #define KEY_SIZE 16
 #define IV_SIZE 12
 

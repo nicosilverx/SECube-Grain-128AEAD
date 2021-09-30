@@ -12,10 +12,10 @@ int main(){
     unsigned char		ct[(MSG_SIZE + 8)*MSG_PACKETS] = {0};
     unsigned char       msg_decrypted[MSG_SIZE*MSG_PACKETS] = {0};
 
-    const char *key_string = "0123456789abcdef123456789abcdef0", *pos_key = key_string;
-    const char *nonce_string = "0123456789abcdef12345678", *pos_nonce = nonce_string;
-    const char *msg_string = "6369616f6e6521216369616f6e652121", *pos_msg = msg_string;
-    const char *ad_string = "1111", *pos_ad = ad_string;
+    const char *key_string = "c4429b565493db8eaac051577124fefb", *pos_key = key_string;
+    const char *nonce_string = "3eadecd0c575e48825f150b9", *pos_nonce = nonce_string;
+    const char *msg_string = "31", *pos_msg = msg_string;
+    const char *ad_string = "b718", *pos_ad = ad_string;
                              
     //Key
     for(i=0; i<sizeof(key)/sizeof(*key); i++){
