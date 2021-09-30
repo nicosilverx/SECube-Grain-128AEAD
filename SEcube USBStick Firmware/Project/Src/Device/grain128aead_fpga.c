@@ -29,7 +29,7 @@ static void GRAIN128AEAD_FPGA_init_pack(FPGA_IPM_DATA *key,
 	int i;
 	FPGA_IPM_BOOLEAN ret;
 
-	lengths = ( msgLen << 8) | adLen );
+	lengths = ( msgLen << 8) | adLen ;
 	// open a interrupt transaction
 	print_uart("Opening FPGA transaction\r\n");
 	print_uart("OPCODE : "); print_uart_8(opcode); print_uart("\r\n");
@@ -238,23 +238,17 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 
 
 	// transform KEY in a block of words ready to be written inside the data buffer
-	print_uart("\r\n[KEY] 8 -> 16 \r\n");
 	for(i = 0; i < GRAIN128AEAD_FPGA_WORDS_KEY ; i++ ){
-		//keyBlock[i] = (FPGA_IPM_DATA) key[ 2*i ] << 8 | key[ 2*i + 1 ];
 		keyBlock[i] = GRAIN128AEAD_FPGA_8_to_16(key[ 2*i ], key[ 2*i + 1 ]);
-		print_uart_8(key[ 2*i ]); print_uart_8(key[ 2*i + 1 ]); print_uart(" -- ");  print_uart_16(keyBlock[ i ]); print_uart("\r\n");
 	}
-	print_uart("\r\n[IV] 8 -> 16 \r\n");
+
 	for(i = 0; i < GRAIN128AEAD_FPGA_WORDS_IV ; i++ ){
 		ivBlock[i] = GRAIN128AEAD_FPGA_8_to_16(IV[ 2*i ], IV[ 2*i + 1 ]);
-		print_uart_8(IV[ 2*i ]); print_uart_8(IV[ 2*i + 1 ]); print_uart(" -- ");  print_uart_16(ivBlock[ i ]); print_uart("\r\n");
 	}
 
 	// transform AD in a block of words ready to be written inside the data buffer
-	print_uart("\r\n[AD] 8 -> 16 \r\n");
 	for(i = 0; i < ADlen/2 ; i++ ) {
 		ADblock[i] = GRAIN128AEAD_FPGA_8_to_16(AD[ 2*i ], AD[ 2*i + 1 ] );
-		print_uart_8(AD[ 2*i ]); print_uart_8(AD[ 2*i + 1 ]); print_uart(" -- ");  print_uart_16(ADblock[ i ]); print_uart("\r\n");
 	}
 
 	// if the total number of AD bytes is odd, the last bytes will be placed on the upper position of a word
@@ -266,10 +260,6 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 
 	// save number of words created inside ADblock
 	subADlen = i;
-
-	print_uart("AD len : "); print_uart_int(ADlen); print_uart("\r\nAD len in words : "); print_uart_int(subADlen); print_uart("\r\ndataIN len : "); print_uart_int(datainLen);
-	print_uart("\r\nmsg bytes to manage : "); print_uart_int(available_dataLen);
-
 
 	if (datainLen == 0) {
 		// In there is no msg, send just the data required for the init packet, waiting only for the MAC as result
@@ -283,7 +273,7 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 			// Create packet init, just at the beginning
 			if ( i_datain == 0 ) {
 				// INIT PACKET
-				print_uart("[INSIDE] INIT PACKET"); print_uart_int(left); print_uart(" > "); print_uart_int(available_dataLen); print_uart(" \r\n ");
+				print_uart("## INIT PACKET"); print_uart_int(left); print_uart(" > "); print_uart_int(available_dataLen); print_uart(" \r\n ");
 				// transform dataIN in a block of 30 words ready to be written inside the data buffer
 				for(i = 0; i < GRAIN128AEAD_FPGA_WORDS_INIT_PACK ; i++ ){
 					datainBlock[i] = GRAIN128AEAD_FPGA_8_to_16(dataIN[i_datain], dataIN[i_datain + 1] );
@@ -296,7 +286,7 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 				// decrement the remaining datainLen of 30 words ( 60 bytes)
 				left -= 2*GRAIN128AEAD_FPGA_WORDS_INIT_PACK;
 			} else {
-				print_uart("[INSIDE] NEXT PACKET"); print_uart_int(left); print_uart(" > "); print_uart_int(available_dataLen); print_uart(" \r\n ");
+				print_uart("## NEXT PACKET"); print_uart_int(left); print_uart(" > "); print_uart_int(available_dataLen); print_uart(" \r\n ");
 				// OTHERS PACKET WITH ONLY MESSAGE
 				// transform dataIN in a block of 58 words ready to be written inside the data buffer
 				for(i = 0; i < GRAIN128AEAD_FPGA_WORDS_NEXT_PACK ; i++ ){
@@ -322,10 +312,10 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 		}
 		subdatainLen = 2*i;
 		if ( left == datainLen ) {
-			print_uart("[OUTSIDE] INIT PACKET"); print_uart_int(left); print_uart(" > "); print_uart_int(available_dataLen); print_uart(" \r\n ");
+			print_uart("INIT PACKET ##"); print_uart_int(left); print_uart(" > "); print_uart_int(available_dataLen); print_uart(" \r\n ");
 			GRAIN128AEAD_FPGA_init_pack(key, IV, ADblock, ADlen, datainBlock, subdatainLen, res, &i_res, GRAIN128AEAD_FPGA_WRITE_MAC, opcode);
 		} else {
-			print_uart("[OUTSIDE] NEXT PACKET"); print_uart_int(left); print_uart(" > "); print_uart_int(available_dataLen); print_uart(" \r\n ");
+			print_uart("NEXT PACKET ##"); print_uart_int(left); print_uart(" > "); print_uart_int(available_dataLen); print_uart(" \r\n ");
 			GRAIN128AEAD_FPGA_next_pack(datainBlock, subdatainLen, res, &i_res, GRAIN128AEAD_FPGA_WRITE_MAC, opcode + 1);
 		}
 	}

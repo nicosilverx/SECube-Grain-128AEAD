@@ -151,15 +151,17 @@ int main(void)
 	print_uart("Lauching FPGA inizialization");
 	for(i=0; i < 3; i++) {
 		print_uart("..");
-		//HAL_Delay(1000);
+		HAL_Delay(1000);
 	}
+	print_uart("[DONE]");
 	FPGA_IPM_init();
 	print_uart("\r\n\r\n");
 	print_uart("Lauching FPGA programming");
 	for(i=0; i < 3; i++) {
 		print_uart("..");
-		//HAL_Delay(1000);
+		HAL_Delay(1000);
 	}
+	print_uart("[DONE]");
 
 	//B5_FPGA_Programming();
 
@@ -172,8 +174,9 @@ int main(void)
 	print_uart("Starting API testing mode");
 	for(i=0; i < 3; i++) {
 		print_uart("..");
-		//HAL_Delay(1000);
+		HAL_Delay(1000);
 	}
+	print_uart("[DONE]");
 	HAL_GPIO_WritePin(GPIOG, FPGA_RST_Pin , GPIO_PIN_SET);
 	HAL_GPIO_WritePin(GPIOG, FPGA_RST_Pin , GPIO_PIN_RESET);
 
@@ -192,20 +195,20 @@ int main(void)
 	print_uart("Starting Encryption... \r\n");
 	test_grain128aead_encryption(4, 26);
 	print_uart("\r\n\r\n");
-//	cmd = 0;
-//	while (cmd != 'd' ){
-//		//print_uart("\f");
-//		print_uart("##################################\r\n");
-//		print_uart("#                                #\r\n");
-//		print_uart("#    GRAIN128-AEAD DECRYPTION    #\r\n");
-//		print_uart("#                                #\r\n");
-//		print_uart("##################################\r\n");
-//		print_uart("\r\n\r\n");
-//		print_uart("Type 'd' to start decryption phase : ");
-//		HAL_UART_Receive(&huart1, &cmd, 1, HAL_MAX_DELAY);
-//	}
-//	print_uart("Starting Decryption... \r\n");
-//	test_grain128aead_decryption(2, 1);
+	cmd = 0;
+	while (cmd != 'd' ){
+		print_uart("\r\n\r\n");
+		print_uart("##################################\r\n");
+		print_uart("#                                #\r\n");
+		print_uart("#    GRAIN128-AEAD DECRYPTION    #\r\n");
+		print_uart("#                                #\r\n");
+		print_uart("##################################\r\n");
+		print_uart("\r\n\r\n");
+		print_uart("Type 'd' to start decryption phase : ");
+		HAL_UART_Receive(&huart1, &cmd, 1, HAL_MAX_DELAY);
+	}
+	print_uart("Starting Decryption... \r\n");
+	test_grain128aead_decryption(2, 12);
 
 	/* USER CODE END  */
 
@@ -253,10 +256,10 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 int test_grain128aead_encryption(uint8_t adLen, uint64_t msgLen) {
-	uint8_t key[16], key_32[32] ;
-	uint8_t iv[12], iv_24[24];
-	uint8_t msg[msgLen], msg_2[2*msgLen];
-	uint8_t ad[adLen], ad_2[2*adLen];
+	uint8_t key[16];
+	uint8_t iv[12];
+	uint8_t msg[msgLen];
+	uint8_t ad[adLen];
 	uint8_t res[msgLen + 8];
 	uint64_t resLen = msgLen + 8;
 	uint16_t i;
@@ -315,6 +318,8 @@ int test_grain128aead_decryption(uint8_t adLen, uint64_t ctxLen) {
 	uint8_t ctx[ctxLen];
 	uint8_t ad[adLen];
 	uint8_t res[ctxLen + 8];
+	uint64_t resLen = ctxLen + 8;
+	uint16_t i;
 
 
 	generate_rnd_vector(key, 16);
@@ -325,10 +330,6 @@ int test_grain128aead_decryption(uint8_t adLen, uint64_t ctxLen) {
 	HAL_Delay(500);
 	generate_rnd_vector(ctx, ctxLen);
 
-	strcpy(key, "");
-	strcpy(iv, "");
-	strcpy(ad, "");
-	strcpy(ctx, "");
 
 	print_uart("Key = ");
 	for (size_t i = 0; i < 16 ; i++) {
@@ -353,6 +354,17 @@ int test_grain128aead_decryption(uint8_t adLen, uint64_t ctxLen) {
 		print_uart_hex( ( ctx[i] & 0xF0 ) >> 4 );
 		print_uart_hex( ctx[i] & 0x0F );
 	}
+
+	GRAIN128AEAD_FPGA_decrypt (key, iv, ad, adLen, ctx, ctxLen, res);
+
+	print_uart("\r\n");
+	print_uart("ctx = ");
+	for (size_t i = 0; i < resLen ; i++) {
+		print_uart_hex( ( res[i] & 0xF0 ) >> 4 );
+		print_uart_hex( res[i] & 0x0F );
+	}
+
+
 
 	return 1;
 
