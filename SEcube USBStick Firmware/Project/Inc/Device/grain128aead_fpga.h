@@ -30,6 +30,8 @@
 #include <string.h>
 #include "Fpgaipm.h"
 
+#include "test_grain.h"
+
 // types
 #define GRAIN128AEAD_FPGA_RETURN_CODE int8_t
 
@@ -40,8 +42,8 @@
 ///@{
 #define GRAIN128AEAD_FPGA_RES_OK				 ( 0)
 #define GRAIN128AEAD_FPGA_RES_INVALID_ARGUMENT (-1)
-#define GRAIN128AEAD_FPGA_WORDS_INIT_PACK 30
-#define GRAIN128AEAD_FPGA_WORDS_NEXT_PACK 58
+#define GRAIN128AEAD_FPGA_WORDS_INIT_PACK 12
+#define GRAIN128AEAD_FPGA_WORDS_NEXT_PACK 12
 #define GRAIN128AEAD_FPGA_WORDS_MAC 4
 #define GRAIN128AEAD_FPGA_WORDS_KEY 8
 #define GRAIN128AEAD_FPGA_WORDS_IV 6
@@ -51,10 +53,10 @@
 #define GRAIN128AEAD_FPGA_WORDS_AD_MAX 10
 #define GRAIN128AEAD_FPGA_WRITE_MAC 1
 #define GRAIN128AEAD_FPGA_NOT_WRITE_MAC 0
-#define GRAIN128AEAD_FPGA_OPCODE 0x10000000
+#define GRAIN128AEAD_FPGA_OPCODE_ENCR 0b0100000u
+#define GRAIN128AEAD_FPGA_OPCODE_DECR 0b0100010u
 ///@}
 /** @} */
-
 
 // public function
 
@@ -65,6 +67,9 @@
  * @param digest Pointer to a blank memory area that can store the computed output digest.
  * @return See \ref shaRet256.
  */
+
+
+
 GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_FPGA_encrypt (
 												uint8_t *key,
 												uint8_t *IV,
