@@ -4,7 +4,7 @@
 	Embedded Algo File.
 
 	CREATED BY: Diamond Deployment Tool 3.12
-	CREATION DATE: Thu Sep 30 14:17:46 2021
+	CREATION DATE: Thu Sep 30 15:59:48 2021
 
 	CHAIN DESCRIPTION:
 	1	LCMXO2-7000HE	FLASH Erase,Program,Verify	F:/lscc/diamond/3.12/bin/nt64/timing/grain128_final_timing.jed

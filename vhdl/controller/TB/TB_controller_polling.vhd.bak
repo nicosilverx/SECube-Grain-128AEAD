@@ -154,46 +154,42 @@ begin
 	begin
 	   
 		wait for HCLK_PERIOD*24; -- random number of cc before starting
-
---key:	
---iv:	
-
-
+		
 -- --		--Init, encrypt 0
  		write("000000", "100000" & CONF_OPEN_TRANSACTION_POLMODE & "0000001"); 
  		--Key (not swapped)
- 		write("000001", x""); --1
- 		write("000010", x""); --2
- 		write("000011", x""); --3
- 		write("000100", x""); --4
- 		write("000101", x""); --5
- 		write("000110", x""); --6
- 		write("000111", x""); --7
- 		write("001000", x""); --8
+ 		write("000001", x"317e"); --1
+ 		write("000010", x"00bb"); --2
+ 		write("000011", x"56d3"); --3
+ 		write("000100", x"5d2c"); --4
+ 		write("000101", x"f772"); --5
+ 		write("000110", x"b80d"); --6
+ 		write("000111", x"99f8"); --7
+ 		write("001000", x"6c87"); --8
  		--IV (not swapped)
- 		write("001001", x""); --9
- 		write("001010", x""); --10
- 		write("001011", x""); --11
- 		write("001100", x""); --12
- 		write("001101", x""); --13
- 		write("001110", x""); --14
+ 		write("001001", x"9cf8"); --9
+ 		write("001010", x"7a0c"); --10
+ 		write("001011", x"a844"); --11
+ 		write("001100", x"5734"); --12
+ 		write("001101", x"29ec"); --13
+ 		write("001110", x"1a0c"); --14
  		--Length msg || AD = 0x08 || 0x02 
- 		write("010001", x""); --17
+ 		write("010001", x"1002"); --17
  		--AD
- 		write("010010", x""); --18
+ 		write("010010", x"0771"); --18
  		--write("010011", x"1111"); --18
  		--Padding for AD
 		
 		
  		--MSG
- 		write("011100", x""); --28
- 		write("011101", x""); --29
- 		write("011110", x""); --30
- 		write("011111", x""); --31 
-		write("100000", x""); --31
-		write("100001", x""); --31
-		write("100010", x""); --31
-		write("100011", x""); --31
+ 		write("011100", x"eb72"); --28
+ 		write("011101", x"ae6f"); --29
+ 		write("011110", x"256b"); --30
+ 		write("011111", x"454b"); --31 e18c 0adf 9026 d1a1
+		write("100000", x"e18c"); --31
+		write("100001", x"0adf"); --31
+		write("100010", x"9026"); --31
+		write("100011", x"d1a1"); --31
 
  		--Polling word
  		write("111111", (others => '0'));
@@ -206,10 +202,10 @@ begin
  		read("011110"); --30
  		read("011111"); --31
  		--MAC
- 		read("101000"); --40
- 		read("101001"); --41
- 		read("101010"); --42
- 		read("101011"); --43
+ 		read("100000"); --32
+ 		read("100001"); --33
+ 		read("100010"); --34
+ 		read("100011"); --35
 		
  		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_POLMODE & "0000001");
 		

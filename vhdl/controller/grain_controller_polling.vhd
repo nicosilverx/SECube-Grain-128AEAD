@@ -1273,7 +1273,7 @@ begin
 					if( (to_integer(unsigned(ac_count)) mod 16) = 0 and (to_integer(unsigned(ac_count)))  > 0) then
 								WE_ct <= '1';
 								ct_ram_addressing := std_logic_vector("00"&(unsigned(lenght_submsg)/2) - unsigned(ac_count(7 downto 4)));
-								--report "ct: " & to_hstring(serial_data_ct) & "@" & to_hstring(ct_ram_addressing);
+								
 								address_ct <= ct_ram_addressing(3 downto 0);
 								data_ct <= serial_data_ct;
 					end if;
@@ -1333,7 +1333,7 @@ begin
 						start_c <= '1';
 						state <= OP_GET_MAC;
 						Address_s <= std_logic_vector(to_unsigned(to_integer((unsigned(lenght_submsg))/2) + to_integer(unsigned(mac_count)), 4));
-						report "address " & to_hstring(std_logic_vector(to_unsigned(to_integer((unsigned(lenght_submsg))/2) + to_integer(unsigned(mac_count)), 4)));
+						
 					else    
 						mac_count := std_logic_vector(to_unsigned(0, 8));
 						if(encrypt_decrypt = '0') then
@@ -1348,7 +1348,7 @@ begin
              
             WHEN OP_GET_MAC =>
 				mac_from_message(15+(16*to_integer(unsigned(mac_count))) downto 16*to_integer(unsigned(mac_count))) <= Q_s;
-				report "Q_s: " & to_hstring(Q_s);
+				
                 state <= WAIT_GET_MAC;
                 
 			WHEN WAIT_GET_MAC =>
@@ -1394,7 +1394,7 @@ begin
 					if(to_integer(unsigned(crypt_count)) < to_integer(unsigned(lenght_submsg))) then
 						data_out <= swapsb(Q_ct(15 downto 8)) & swapsb(Q_ct(7 downto 0));
 						
-						--report "ct: " & to_hstring(swapsb(Q_ct(15 downto 8)) & swapsb(Q_ct(7 downto 0))) & "@" & to_hstring(Address_ct);
+						
 						
 						buffer_enable <= '1';
 						address <= std_logic_vector(to_unsigned(to_integer(unsigned(crypt_count))/2 + to_integer(unsigned(msg_address_decode)), ADD_WIDTH));
@@ -1430,14 +1430,14 @@ begin
 					if(to_integer(unsigned(mac_count)) = 0) then
 						buffer_enable <= '1';
 						rw <= '1';
-						address <= std_logic_vector(to_unsigned(to_integer(unsigned(mac_count)) + to_integer(unsigned(msg_address_decode)) + 4, ADD_WIDTH));
+						address <= std_logic_vector(to_unsigned(to_integer(unsigned(mac_count)) + 40, ADD_WIDTH));
 						data_out <= swapsb(TAG((15+(16*to_integer(unsigned(mac_count)))) downto 8+(16*to_integer(unsigned(mac_count))))) & swapsb(TAG((7+(16*to_integer(unsigned(mac_count)))) downto (16*to_integer(unsigned(mac_count)))));
 						error <= '0';
 						state <= OP_WRITE_MAC;
 					elsif(to_integer(unsigned(mac_count)) > 0 and to_integer(unsigned(mac_count)) < 4) then
 						buffer_enable <= '1';
 						rw <= '1';
-						address <= std_logic_vector(to_unsigned(to_integer(unsigned(mac_count)) + to_integer(unsigned(msg_address_decode)) + 4, ADD_WIDTH));
+						address <= std_logic_vector(to_unsigned(to_integer(unsigned(mac_count)) + 40, ADD_WIDTH));
 						data_out <= swapsb(TAG((15+(16*to_integer(unsigned(mac_count)))) downto 8+(16*to_integer(unsigned(mac_count))))) & swapsb(TAG((7+(16*to_integer(unsigned(mac_count)))) downto (16*to_integer(unsigned(mac_count)))));
 						error <= '0';
 						state <= OP_WRITE_MAC;
@@ -1456,7 +1456,7 @@ begin
 				if(enable = '1') then
 					data_out <= swapsb(TAG((15+(16*to_integer(unsigned(mac_count)))) downto 8+(16*to_integer(unsigned(mac_count))))) & swapsb(TAG((7+(16*to_integer(unsigned(mac_count)))) downto (16*to_integer(unsigned(mac_count)))));
 					buffer_enable <= '1';
-					address <= std_logic_vector(to_unsigned(to_integer(unsigned(mac_count)) + to_integer(unsigned(msg_address_decode)) + 4, ADD_WIDTH));
+					address <= std_logic_vector(to_unsigned(to_integer(unsigned(mac_count)) + 40, ADD_WIDTH));
 					rw <= '1';
 					error <= '0';
 					mac_count := std_logic_vector(to_unsigned(1, 8) + unsigned(mac_count));
