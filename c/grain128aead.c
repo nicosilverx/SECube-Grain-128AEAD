@@ -15,9 +15,8 @@
 */
 
 #define MSG_PACKETS 1
-#define MSG_SIZE 1
-#define AD_SIZE 2
-
+#define MSG_SIZE 10
+#define AD_SIZE 4
 
 #define KEY_SIZE 16
 #define IV_SIZE 12
@@ -163,19 +162,6 @@ int my_grain_init(const unsigned char key_in[16], const unsigned char iv_in[12])
 		grain.auth_sr[i_init] = 0;
     }
 
-	printf("----- INIT -----\n");
-
-	printf("\nStarting LFSR: ");
-	for(k=0; k<128; k++){
-		printf("%d", grain.lfsr[k]);
-	}
-	printf("\n");
-
-	printf("\nStarting NFSR: ");
-	for(k=0; k<128; k++){
-		printf("%d", grain.nfsr[k]);
-	}
-	printf("\n\n");
 
     //Let the pre-output generator run for 256 c.c.
     grain_round = INIT;
@@ -183,17 +169,6 @@ int my_grain_init(const unsigned char key_in[16], const unsigned char iv_in[12])
 		tmp_nz = next_z(0);
 	}
 
-	printf("\nAfter 256cc LFSR: ");
-	for(k=0; k<128; k++){
-		printf("%d", grain.lfsr[k]);
-	}
-	printf("\n");
-
-	printf("\nAfter 256cc NFSR: ");
-	for(k=0; k<128; k++){
-		printf("%d", grain.nfsr[k]);
-	}
-	printf("\n\n");
 
 
     // inititalize the accumulator and shift reg. using the first 64 bits of the key
@@ -219,30 +194,6 @@ int my_grain_init(const unsigned char key_in[16], const unsigned char iv_in[12])
     //End of the initialization
     grain_round = NORMAL;
 
-	printf("\nAfter init LFSR: ");
-	for(k=0; k<128; k++){
-		printf("%d", grain.lfsr[k]);
-	}
-	printf("\n");
-
-	printf("\nAfter init NFSR: ");
-	for(k=0; k<128; k++){
-		printf("%d", grain.nfsr[k]);
-	}
-	printf("\n");
-
-	//SR 
-	printf("\nAfter Init SR: ");
-	for(k=0; k<64; k++){
-		printf("%d", grain.auth_sr[k]);
-	}
-	printf("\n");
-
-	printf("\nAfter Init acc: ");
-	for(k=0; k<64; k++){
-		printf("%d", grain.auth_acc[k]);
-	}
-	printf("\n\n");
 
 }
 
@@ -285,7 +236,7 @@ void encrypt_message(unsigned char key[16], unsigned char iv[12],
 	}
 
     //accumulate tag for associated data only 
-	printf("----- ACCUMULATING TAG FOR AD ONLY-----\n");
+	//printf("----- ACCUMULATING TAG FOR AD ONLY-----\n");
     unsigned long long ad_cnt = 0;
 	unsigned char adval = 0;
 	unsigned int counter = 0, acc_counter = 0;
@@ -307,18 +258,6 @@ void encrypt_message(unsigned char key[16], unsigned char iv[12],
 		}
 	}
 
-	//SR after ammulation of the tag
-	printf("\nAfter Accumulation for AD only SR: ");
-	for(k=0; k<64; k++){
-		printf("%d", grain.auth_sr[k]);
-	}
-	printf("\n");
-
-	printf("\nAfter Accumulation for AD only ACC: ");
-	for(k=0; k<64; k++){
-		printf("%d", grain.auth_acc[k]);
-	}
-	printf("\n\n");
 
 
 	for(int packets = 0; packets < MSG_PACKETS; packets++){
@@ -329,7 +268,7 @@ void encrypt_message(unsigned char key[16], unsigned char iv[12],
 
 		for (i = 0; i < MSG_SIZE; i++) {
 			msg_swb[i] = swapsb(message[i + MSG_SIZE*packets]);
-			printf("%02x ", msg_swb[i]);
+			//printf("%02x ", msg_swb[i]);
 		}
 		
 
@@ -343,7 +282,7 @@ void encrypt_message(unsigned char key[16], unsigned char iv[12],
 		message_bit[message_bit_len-1] = 1;
 
 		//Encrypt the message
-		printf("----- ENCRYPTION -----\n");
+		//printf("----- ENCRYPTION -----\n");
 		unsigned long long ac_cnt = 0;
 		unsigned long long m_cnt = 0;
 		unsigned long long c_cnt = 0;
@@ -358,7 +297,7 @@ void encrypt_message(unsigned char key[16], unsigned char iv[12],
 					//generate_keystream
 					// transform it back to 8 bits per byte
 					cc |= (message_bit[m_cnt] ^ z_next) << (7 - (c_cnt % 8));
-					printf("msg_bit[%d]: %d\n", m_cnt, message_bit[m_cnt]);
+					//printf("msg_bit[%d]: %d\n", m_cnt, message_bit[m_cnt]);
 					m_cnt++;
 					c_cnt++;
 				} else {
@@ -369,46 +308,20 @@ void encrypt_message(unsigned char key[16], unsigned char iv[12],
 					auth_shift(z_next);
 				}
 			}
-			printf("\n");
+			//printf("\n");
 			ciphertext[k] = swapsb(cc);
 			
 		}
-
-		//SR 
-		printf("\n\nAfter encryption SR: ");
-		for(int yy=0; yy<64; yy++){
-			printf("%d", grain.auth_sr[yy]);
-		}
-		printf("\n");
-
-		printf("\nAfter encryption acc: ");
-		for(int yy=0; yy<64; yy++){
-			printf("%d", grain.auth_acc[yy]);
-		}
-		printf("\n\n");
 
 		// generate unused keystream bit
 		next_z(0);
 		// the 1 in the padding means accumulation
 		accumulate();
 
-		//SR 
-		printf("\n\nAfter padding accumulation SR: ");
-		for(int yy=0; yy<64; yy++){
-			printf("%d", grain.auth_sr[yy]);
-		}
-		printf("\n");
-
-		printf("\nAfter padding accumulation ACC: ");
-		for(int yy=0; yy<64; yy++){
-			printf("%d", grain.auth_acc[yy]);
-		}
-		printf("\n\n");
-
 		// append MAC to ciphertext 
 		unsigned long long acc_idx = 0;
 
-		printf("MAC: ");
+		printf("\nMAC: ");
 		for (i = MSG_SIZE; i < MSG_SIZE + 8; i++) {
 			unsigned char acc = 0;
 			// transform back to 8 bits per byte
@@ -483,7 +396,7 @@ int decrypt_message(unsigned char key[16], unsigned char iv[12],
 	unsigned long long ad_cnt = 0;
 	unsigned char adval = 0;
 
-	printf("----- ACCUMULATING TAG FOR AD ONLY-----\n");
+	//printf("----- ACCUMULATING TAG FOR AD ONLY-----\n");
 	/* accumulate tag for associated data only */
 	for ( k = 0; k < (AD_SIZE + 1); k++) {
 		/* every second bit is used for keystream, the others for MAC */
@@ -502,21 +415,9 @@ int decrypt_message(unsigned char key[16], unsigned char iv[12],
 		}
 	}
 
-	//SR after ammulation of the tag
-	printf("\nAfter Accumulation for AD only SR: ");
-	for(k=0; k<64; k++){
-		printf("%d", grain.auth_sr[k]);
-	}
-	printf("\n");
-
-	printf("\nAfter Accumulation for AD only ACC: ");
-	for(k=0; k<64; k++){
-		printf("%d", grain.auth_acc[k]);
-	}
-	printf("\n\n");
 
 	//Decrypt the message
-	printf("----- DECRYPTION -----\n");
+	//printf("----- DECRYPTION -----\n");
 	unsigned long long ac_cnt = 0;
 	unsigned long long c_cnt = 0;
 	unsigned char msgbyte = 0;
@@ -547,36 +448,11 @@ int decrypt_message(unsigned char key[16], unsigned char iv[12],
 		message[k] = swapsb(msgbyte);
 	}
 
-	//SR 
-	printf("\n\nAfter decryption SR: ");
-	for(int yy=0; yy<64; yy++){
-		printf("%d", grain.auth_sr[yy]);
-	}
-	printf("\n");
-
-	printf("\nAfter decryption acc: ");
-	for(int yy=0; yy<64; yy++){
-		printf("%d", grain.auth_acc[yy]);
-	}
-	printf("\n\n");
 
 	// generate unused keystream bit
 	next_z(0);
 	// the 1 in the padding means accumulation
 	accumulate();
-
-	//SR 
-	printf("\n\nAfter padding accumulation SR: ");
-	for(int yy=0; yy<64; yy++){
-		printf("%d", grain.auth_sr[yy]);
-	}
-	printf("\n");
-
-	printf("\nAfter padding accumulation ACC: ");
-	for(int yy=0; yy<64; yy++){
-		printf("%d", grain.auth_acc[yy]);
-	}
-	printf("\n\n");
 
 	printf("----- AUTHENTICATION -----\n");
 	// check MAC

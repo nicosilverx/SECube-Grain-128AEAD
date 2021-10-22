@@ -16,7 +16,7 @@ typedef struct {
 } grain_data;
 
 void init_grain(grain_state *grain, const unsigned char *key, const unsigned char *iv);
-unsigned char next_lfsr_fb();
+unsigned char next_lfsr_fb();									
 unsigned char next_nfsr_fb();
 unsigned char next_h();
 unsigned char shift(unsigned char fsr[128], unsigned char fb);
