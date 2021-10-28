@@ -82,9 +82,9 @@ FPGA_IPM_BOOLEAN FPGA_IPM_init() {
 
 	// Timing (Read)
 	Timing.AccessMode = FMC_ACCESS_MODE_A;
-	Timing.AddressSetupTime = 6;
+	Timing.AddressSetupTime = 8;
 	Timing.AddressHoldTime = 0;
-	Timing.DataSetupTime = 6;
+	Timing.DataSetupTime = 8;
 	Timing.BusTurnAroundDuration = 0; // don't care
 	Timing.CLKDivision = 10; // don't care
 	Timing.DataLatency = 2; // don't care

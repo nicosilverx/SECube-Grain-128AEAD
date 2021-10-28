@@ -5,7 +5,7 @@
                          SHA256 IP core in an IP-Manager-based environment
   ******************************************************************************
   *
-  * Copyright � 2016-present Blu5 Group <https://www.blu5group.com>
+  * Copyright ï¿½ 2016-present Blu5 Group <https://www.blu5group.com>
   *
   * This library is free software; you can redistribute it and/or
   * modify it under the terms of the GNU Lesser General Public
@@ -29,6 +29,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "Fpgaipm.h"
+#include "../test_grain.h"
 
 
 // types
@@ -43,7 +44,12 @@
 #define GRAIN128AEAD_FPGA_RES_INVALID_ARGUMENT (-1)
 #define GRAIN128AEAD_FPGA_WORDS_INIT_PACK 12
 #define GRAIN128AEAD_FPGA_WORDS_NEXT_PACK 12
+#define GRAIN128AEAD_FPGA_AVAILABLE_WORDS_ENCR 12
+#define GRAIN128AEAD_FPGA_AVAILABLE_WORDS_DECR 16
+#define GRAIN128AEAD_FPGA_ADDR_MSG_INIT_PACK 28
+#define GRAIN128AEAD_FPGA_ADDR_MSG_NEXT_PACK 2
 #define GRAIN128AEAD_FPGA_WORDS_MAC 4
+#define GRAIN128AEAD_FPGA_ADDR_MAC 40
 #define GRAIN128AEAD_FPGA_WORDS_KEY 8
 #define GRAIN128AEAD_FPGA_WORDS_IV 6
 #define GRAIN128AEAD_FPGA_WORDS_CW 1
@@ -51,6 +57,7 @@
 #define GRAIN128AEAD_FPGA_WORDS_UNUSED 2
 #define GRAIN128AEAD_FPGA_WORDS_AD_MAX 10
 #define GRAIN128AEAD_FPGA_WRITE_MAC 1
+#define GRAIN128AEAD_FPGA_ADDR_MAC 40
 #define GRAIN128AEAD_FPGA_NOT_WRITE_MAC 0
 #define GRAIN128AEAD_FPGA_OPCODE_ENCR 0b0100000u
 #define GRAIN128AEAD_FPGA_OPCODE_DECR 0b0100010u

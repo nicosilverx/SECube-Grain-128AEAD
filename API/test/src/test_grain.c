@@ -22,7 +22,7 @@ void print_uart_hex(uint8_t num) {
 
 uint8_t to_hex(uint8_t num) {
 	if (num > '9')
-		num = num - 'a';
+		num = num - 'a' + 10;
 	else
 		num = num - '0';
 

@@ -86,8 +86,7 @@ void SystemClock_Config(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-int test_grain128aead_encryption(uint8_t adLen, uint64_t msgLen);
-int test_grain128aead_decryption(uint8_t adLen, uint64_t ctxLen);
+int test_grain128aead(uint8_t adLen, uint64_t msgLen);
 
 /* USER CODE END PFP */
 
@@ -142,9 +141,9 @@ int main(void)
 	/* USER CODE BEGIN */
 	uint8_t cmd = 0;
 	uint16_t i;
-	while(cmd != 't') {
+	while(cmd != 'c') {
 		print_uart("\f");
-		print_uart("Type 't' to launch testing mode : ");
+		print_uart("Type 'c' to launch configuration mode : ");
 		HAL_UART_Receive(&huart1, &cmd, 1, HAL_MAX_DELAY);
 	}
 	print_uart("\r\n\r\n");
@@ -158,7 +157,7 @@ int main(void)
 
 	print_uart("\r\n\r\n");
 	print_uart("Lauching FPGA programming");
-	B5_FPGA_Programming();
+	//B5_FPGA_Programming();
 	for(i=0; i < 3; i++) {
 		print_uart("..");
 		HAL_Delay(1000);
@@ -178,23 +177,19 @@ int main(void)
 	}
 	print_uart("[DONE]");
 
-	HAL_GPIO_WritePin(GPIOG, FPGA_RST_Pin , GPIO_PIN_SET);
-	HAL_GPIO_WritePin(GPIOG, FPGA_RST_Pin , GPIO_PIN_RESET);
-
-
-	while (cmd != 'e' ){
+	while (cmd != 't' ){
 		print_uart("\f");
 		print_uart("##################################\r\n");
 		print_uart("#                                #\r\n");
-		print_uart("#    GRAIN128-AEAD ENCRYPTION    #\r\n");
+		print_uart("#     GRAIN128-AEAD TESTING      #\r\n");
 		print_uart("#                                #\r\n");
 		print_uart("##################################\r\n");
 		print_uart("\r\n\r\n");
-		print_uart("Type 'e' to start encryption phase : ");
+		print_uart("Type 't' to start testing phase : ");
 		HAL_UART_Receive(&huart1, &cmd, 1, HAL_MAX_DELAY);
 	}
-	print_uart("Starting Encryption... \r\n");
-	test_grain128aead_encryption( 4 ,	// AD length in bytes 
+	print_uart("Starting Testing Verification... \r\n");
+	test_grain128aead( 4 ,	// AD length in bytes
 								 10 );	// message length in bytes
 	print_uart("\r\n\r\n");
 	// cmd = 0;
@@ -257,109 +252,79 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-int test_grain128aead_encryption(uint8_t adLen, uint64_t msgLen) {
-	uint8_t key[16];
-	uint8_t iv[12];
-	uint8_t msg[msgLen];
-	uint8_t ad[adLen];
-	uint8_t res[msgLen + 8];
+int test_grain128aead(uint8_t adLen, uint64_t msgLen) {
+	uint8_t res_vhdl[(msgLen + 8)*2];
 	uint64_t resLen = msgLen + 8;
 
-    const uint8_t *key_string = "def09abc56781234cdef89ab45670123", *pos_key = key_string;
-    const uint8_t *iv_string = "56781234cdef89ab45670123", *pos_iv = iv_string;
-    const uint8_t *msg_string = "012321216e65616f6369", *pos_msg = msg_string;
-    const uint8_t *ad_string = "22221111", *pos_ad = ad_string;
+	const char *key_string = "0123456789abcdef123456789abcdef0";
+	const char *iv_string = "0123456789abcdef12345678";
+	const char *msg_string = "6369616f6e6521210123";
+	const char *ad_string = "11112222";
 
 
-	print_uart("Key = ");
-	for (size_t i = 0; i < 16 ; i++) {
-		key[i] = ( to_hex(pos_key[2*i]) & 0x0F ) << 4 | ( to_hex(pos_key[2*i+1]) & 0x0F );
-		print_uart_8(key[i]);
+
+	GRAIN128AEAD_FPGA_encrypt (key_string, iv_string, ad_string, adLen, msg_string, msgLen, res_vhdl);
+
+
+	print_uart("\r\n");
+	print_uart("ctx = ");
+	for(size_t i=0;i<(msgLen+8)*2;i++){
+		print_uart_hex(res_vhdl[i]);
 	}
 
-	print_uart("\r\nIV = ");
-	for (size_t i = 0; i < 12 ; i++) {
-		iv[i] = ( to_hex(pos_iv[2*i]) & 0x0F ) << 4 | ( to_hex(pos_iv[2*i+1]) & 0x0F );
-		print_uart_8(iv[i]);
-	}
-	print_uart("\r\nMSG = ");
+
+	uint8_t msg_decrypted[msgLen+8];
+
+	/*GRAIN128AEAD_FPGA_decrypt (key, iv, ad, adLen, res, resLen-8, msg_decrypted);
+
+	print_uart("Decryption\r\n");
+	print_uart("msg_decrypted = ");
 	for (size_t i = 0; i < msgLen ; i++) {
-		msg[i] = ( to_hex(pos_msg[2*i]) & 0x0F ) << 4 | ( to_hex(pos_msg[2*i+1]) & 0x0F );
-		print_uart_8(msg[i]);
-	}
-	print_uart("\r\nAD = ");
-	for (size_t i = 0; i < adLen ; i++) {
-		ad[i] = ( to_hex(pos_ad[2*i]) & 0x0F ) << 4 | ( to_hex(pos_ad[2*i+1]) & 0x0F );
-		print_uart_8(ad[i]);
-	}
-
-	GRAIN128AEAD_FPGA_encrypt (key, iv, ad, adLen, msg, msgLen, res);
-
-	print_uart("\r\n");
-	print_uart("ctx = ");
-	for (size_t i = 0; i < resLen ; i++) {
-		print_uart_hex( ( res[i] & 0xF0 ) >> 4 );
-		print_uart_hex( res[i] & 0x0F );
-	}
-
+		print_uart_hex( ( msg_decrypted[i] & 0xF0 ) >> 4 );
+		print_uart_hex( msg_decrypted[i] & 0x0F );
+	}*/
 	return 1;
 
 }
 
-
-int test_grain128aead_decryption(uint8_t adLen, uint64_t ctxLen) {
-	uint8_t key[16];
-	uint8_t iv[12];
-	uint8_t ctx[ctxLen];
-	uint8_t ad[adLen];
-	uint8_t res[ctxLen + 8];
-	uint64_t resLen = ctxLen + 8;
-	uint16_t i;
-
-
-    const uint8_t *key_string = "0123456789abcdef123456789abcdef0", *pos_key = key_string;
-    const uint8_t *iv_string = "0123456789abcdef12345678", *pos_iv = iv_string;
-    const uint8_t *ctx_string = "6369616f6e652121ffff", *pos_ctx = ctx_string;
-    const uint8_t *ad_string = "11112222", *pos_ad = ad_string;
-
-
-	print_uart("Key = ");
-	for (size_t i = 0; i < 16 ; i++) {
-		key[i] = ( to_hex(pos_key[2*i]) & 0x0F ) << 4 | ( to_hex(pos_key[2*i+1]) & 0x0F );
-		print_uart_8(key[i]);
-	}
-
-	print_uart("\r\nIV = ");
-	for (size_t i = 0; i < 12 ; i++) {
-		iv[i] = ( to_hex(pos_iv[2*i]) & 0x0F ) << 4 | ( to_hex(pos_iv[2*i+1]) & 0x0F );
-		print_uart_8(iv[i]);
-	}
-	print_uart("\r\nCTX = ");
-	for (size_t i = 0; i < ctxLen ; i++) {
-		ctx[i] = ( to_hex(pos_ctx[2*i]) & 0x0F ) << 4 | ( to_hex(pos_ctx[2*i+1]) & 0x0F );
-		print_uart_8(ctx[i]);
-	}
-	print_uart("\r\nAD = ");
-	for (size_t i = 0; i < adLen ; i++) {
-		ad[i] = ( to_hex(pos_ad[2*i]) & 0x0F ) << 4 | ( to_hex(pos_ad[2*i+1]) & 0x0F );
-		print_uart_8(ad[i]);
-	}
-
-	GRAIN128AEAD_FPGA_decrypt (key, iv, ad, adLen, ctx, ctxLen, res);
-
-	print_uart("\r\n");
-	print_uart("ctx = ");
-	for (size_t i = 0; i < resLen ; i++) {
-		print_uart_hex( ( res[i] & 0xF0 ) >> 4 );
-		print_uart_hex( res[i] & 0x0F );
-	}
-
-
-
-	return 1;
-
-
-}
+//int test_grain128aead(uint8_t adLen, uint64_t msgLen) {
+//	uint8_t key[16];
+//	uint8_t iv[12];
+//	uint8_t msg[msgLen];
+//	uint8_t ad[adLen];
+//	uint8_t res[msgLen + 8], res_vhdl[(msgLen + 8)*2], res_hex[(msgLen + 8)*2];
+//	uint64_t resLen = msgLen + 8;
+//
+//	const char *key_string = "0123456789abcdef123456789abcdef0",  *pos_key = key_string;
+//	const char *iv_string = "0123456789abcdef12345678",  *pos_iv = iv_string;
+//	const char *msg_string = "6369616f6e6521210123",  *pos_msg = msg_string;
+//	const char *ad_string = "11112222",  *pos_ad = ad_string;
+//
+//
+//
+//	GRAIN128AEAD_FPGA_encrypt (key_string, iv_string, ad_string, adLen, msg_string, msgLen, res_vhdl);
+//
+//
+//	print_uart("\r\n");
+//	print_uart("ctx = ");
+//	for(size_t i=0;i<(msgLen+8)*2;i++){
+//		print_uart_hex(res_vhdl[i]);
+//	}
+//
+//
+//	uint8_t msg_decrypted[msgLen+8];
+//
+//	/*GRAIN128AEAD_FPGA_decrypt (key, iv, ad, adLen, res, resLen-8, msg_decrypted);
+//
+//	print_uart("Decryption\r\n");
+//	print_uart("msg_decrypted = ");
+//	for (size_t i = 0; i < msgLen ; i++) {
+//		print_uart_hex( ( msg_decrypted[i] & 0xF0 ) >> 4 );
+//		print_uart_hex( msg_decrypted[i] & 0x0F );
+//	}*/
+//	return 1;
+//
+//}
 /* USER CODE END 4 */
 
 #ifdef USE_FULL_ASSERT
