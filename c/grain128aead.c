@@ -14,13 +14,6 @@
 
 */
 
-#define MSG_PACKETS 1
-#define MSG_SIZE 10
-#define AD_SIZE 4
-
-#define KEY_SIZE 16
-#define IV_SIZE 12
-
 //Grain128 struct
 grain_state grain;
 unsigned char grain_round;
@@ -41,7 +34,7 @@ unsigned char swapsb(unsigned char n){
 }
 
 //shift: given an array and a value, it performs the SR
-unsigned char shift(unsigned char fsr[128], unsigned char fb){
+unsigned char shift(unsigned char *fsr, unsigned char fb){
 	unsigned char out = fsr[0];
 	for (i_shift = 0; i_shift < 127; i_shift++) {
 		fsr[i_shift] = fsr[i_shift+1];
@@ -132,7 +125,7 @@ void auth_shift(unsigned char fb){
 
 //grain_init: load the (key,iv) and initializes the cipher. 
 //Warning: (key,iv) should be swapped by the client (i.e. encrypt/decrypt())
-int my_grain_init(const unsigned char key_in[16], const unsigned char iv_in[12]){
+int my_grain_init(const unsigned char *key_in, const unsigned char *iv_in){
 	char tmp_nz = 0;
 
     //Assign IV to LFSR
@@ -197,9 +190,9 @@ int my_grain_init(const unsigned char key_in[16], const unsigned char iv_in[12])
 
 }
 
-void encrypt_message(unsigned char key[16], unsigned char iv[12], 
-    unsigned char message[MSG_SIZE], unsigned char associated_data[AD_SIZE],
-    unsigned char ciphertext[MSG_SIZE+8]){
+void encrypt_message(unsigned char *key, unsigned char *iv, 
+    unsigned char *message, unsigned char *associated_data,
+    unsigned char *ciphertext){
 
 	//Swapped arrays
     unsigned char key_swb[16] = {0};
@@ -257,96 +250,81 @@ void encrypt_message(unsigned char key[16], unsigned char iv[12],
 			}
 		}
 	}
-
-
-
-	for(int packets = 0; packets < MSG_PACKETS; packets++){
 		
-		memset(msg_swb, 0, sizeof(msg_swb));
-		memset(message_bit, 0, sizeof(message_bit));
-		memset(ciphertext, 0, MSG_SIZE+8);
+	memset(msg_swb, 0, sizeof(msg_swb));
+	memset(message_bit, 0, sizeof(message_bit));
+	memset(ciphertext, 0, MSG_SIZE+8);
 
-		for (i = 0; i < MSG_SIZE; i++) {
-			msg_swb[i] = swapsb(message[i + MSG_SIZE*packets]);
-			//printf("%02x ", msg_swb[i]);
+	for (i = 0; i < MSG_SIZE; i++) {
+		msg_swb[i] = swapsb(message[i]);
+		//printf("%02x ", msg_swb[i]);
+	}
+	
+
+	//Byte => bits
+	for ( k = 0; k < MSG_SIZE; k++) {
+		for ( l = 0; l < 8; l++) {
+			message_bit[8 * k + l ] = (msg_swb[k] & (1 << (7-l))) >> (7-l);
 		}
-		
+	}
+	//Last bit should be 1
+	message_bit[message_bit_len-1] = 1;
 
-		//Byte => bits
-		for ( k = 0; k < MSG_SIZE; k++) {
-			for ( l = 0; l < 8; l++) {
-				message_bit[8 * k + l ] = (msg_swb[k] & (1 << (7-l))) >> (7-l);
-			}
-		}
-		//Last bit should be 1
-		message_bit[message_bit_len-1] = 1;
+	//Encrypt the message
+	//printf("----- ENCRYPTION -----\n");
+	unsigned long long ac_cnt = 0;
+	unsigned long long m_cnt = 0;
+	unsigned long long c_cnt = 0;
+	unsigned char cc = 0;
 
-		//Encrypt the message
-		//printf("----- ENCRYPTION -----\n");
-		unsigned long long ac_cnt = 0;
-		unsigned long long m_cnt = 0;
-		unsigned long long c_cnt = 0;
-		unsigned char cc = 0;
-
-		for (k = 0; k < MSG_SIZE; k++) {
-			// every second bit is used for keystream, the others for MAC
-			cc = 0;
-			for (j = 0; j < 16; j++) {
-				unsigned char z_next = next_z(0);
-				if (j % 2 == 0) {
-					//generate_keystream
-					// transform it back to 8 bits per byte
-					cc |= (message_bit[m_cnt] ^ z_next) << (7 - (c_cnt % 8));
-					//printf("msg_bit[%d]: %d\n", m_cnt, message_bit[m_cnt]);
-					m_cnt++;
-					c_cnt++;
-				} else {
-					if (message_bit[ac_cnt] == 1) {
-						accumulate();
-					}
-					ac_cnt ++;
-					auth_shift(z_next);
+	for (k = 0; k < MSG_SIZE; k++) {
+		// every second bit is used for keystream, the others for MAC
+		cc = 0;
+		for (j = 0; j < 16; j++) {
+			unsigned char z_next = next_z(0);
+			if (j % 2 == 0) {
+				//generate_keystream
+				// transform it back to 8 bits per byte
+				cc |= (message_bit[m_cnt] ^ z_next) << (7 - (c_cnt % 8));
+				//printf("msg_bit[%d]: %d\n", m_cnt, message_bit[m_cnt]);
+				m_cnt++;
+				c_cnt++;
+			} else {
+				if (message_bit[ac_cnt] == 1) {
+					accumulate();
 				}
+				ac_cnt ++;
+				auth_shift(z_next);
 			}
-			//printf("\n");
-			ciphertext[k] = swapsb(cc);
-			
 		}
-
-		// generate unused keystream bit
-		next_z(0);
-		// the 1 in the padding means accumulation
-		accumulate();
-
-		// append MAC to ciphertext 
-		unsigned long long acc_idx = 0;
-
-		printf("\nMAC: ");
-		for (i = MSG_SIZE; i < MSG_SIZE + 8; i++) {
-			unsigned char acc = 0;
-			// transform back to 8 bits per byte
-			for (j = 0; j < 8; j++) {
-				acc |= grain.auth_acc[8 * acc_idx + j] << (7 - j);
-			}
-			ciphertext[i] = swapsb(acc);
-			printf("%02x", ciphertext[i]);
-			acc_idx++;
-		}
-		printf("\n");
-
-		printf("Ciphertext: 0x");
-		for(size_t count = 0; count < (MSG_SIZE+8); count++)
-			printf("%02x ", ciphertext[count]);
-		printf("\n");
-
+		//printf("\n");
+		ciphertext[k] = swapsb(cc);
 		
+	}
+
+	// generate unused keystream bit
+	next_z(0);
+	// the 1 in the padding means accumulation
+	accumulate();
+
+	// append MAC to ciphertext 
+	unsigned long long acc_idx = 0;
+
+	for (i = MSG_SIZE; i < MSG_SIZE + 8; i++) {
+		unsigned char acc = 0;
+		// transform back to 8 bits per byte
+		for (j = 0; j < 8; j++) {
+			acc |= grain.auth_acc[8 * acc_idx + j] << (7 - j);
+		}
+		ciphertext[i] = swapsb(acc);
+		acc_idx++;
 	}
 
 }
 
-int decrypt_message(unsigned char key[16], unsigned char iv[12], 
-    unsigned char ciphertext[MSG_SIZE+8], unsigned char associated_data[AD_SIZE],
-    unsigned char message[MSG_SIZE]){
+int decrypt_message(unsigned char *key, unsigned char *iv, 
+    unsigned char *ciphertext, unsigned char *associated_data,
+    unsigned char *message){
 	
 	//Swapped arrays
 	unsigned char key_swb[16] = {0};
@@ -453,15 +431,18 @@ int decrypt_message(unsigned char key[16], unsigned char iv[12],
 	next_z(0);
 	// the 1 in the padding means accumulation
 	accumulate();
-
-	printf("----- AUTHENTICATION -----\n");
+	unsigned int equal = 1;
+	printf("----- AUTHENTICATION PHASE-----\n");
 	// check MAC
 	for(k=0; k<64; k++){
 		if(grain.auth_acc[k] != ciphertext_bit[8*(MSG_SIZE) + k]){
 			printf("NOT AUTHENTICATED!\n");
+			equal = 0;
 			memset(message, 0, MSG_SIZE);
 			return -1;
 		}
 	}
+	if(equal)
+		printf("AUTHENTICATED!\n");
 	return 0;
 }
