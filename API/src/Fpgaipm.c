@@ -111,9 +111,9 @@ FPGA_IPM_BOOLEAN FPGA_IPM_init() {
 
 	// ExtTiming (Write)
 	ExtTiming.AccessMode = FMC_ACCESS_MODE_A;
-	ExtTiming.AddressSetupTime = 6;
+	ExtTiming.AddressSetupTime = 8;
 	ExtTiming.AddressHoldTime = 0;
-	ExtTiming.DataSetupTime = 6;
+	ExtTiming.DataSetupTime = 8;
 	ExtTiming.BusTurnAroundDuration = 0; // don't care
 	ExtTiming.CLKDivision = 10; // don't care
 	ExtTiming.DataLatency = 2; // don't care

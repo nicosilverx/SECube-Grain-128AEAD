@@ -10,6 +10,17 @@
 
 #define GRAIN128AEAD_FPGA_CORE 0x1
 
+static FPGA_CLEAR_DATA_BUFFER(){
+	//CLEAR DATABUFFER
+	FPGA_IPM_DATA add = 0x0;
+	FPGA_IPM_DATA zero = 0x0;
+	FPGA_IPM_open(0x1, 0x0, 0, 0);
+	for(int i=0; i<64; i++){
+		FPGA_IPM_write(0x0, add, &zero);
+	}
+	FPGA_IPM_close(0x0);
+}
+
 
 static FPGA_IPM_DATA GRAIN128AEAD_FPGA_8_to_16(uint8_t dataMSV, uint8_t dataLSV) {
 	return ( dataMSV << 8 ) | dataLSV ;
@@ -21,28 +32,67 @@ static void GRAIN128AEAD_FPGA_init_pack(FPGA_IPM_DATA *key,
 										FPGA_IPM_DATA *msg, uint8_t msgLen,
 										FPGA_IPM_DATA *res, uint8_t *i_res, FPGA_IPM_OPCODE opcode)
 {
+
 	FPGA_IPM_ADDRESS add = 1;
 	FPGA_IPM_DATA lengths;
 	uint8_t index_res = *i_res;
 	FPGA_IPM_DATA polling_semaphore;
 	int i;
-	//FPGA_IPM_BOOLEAN ret;
+	FPGA_IPM_BOOLEAN ret;
+	FPGA_IPM_DATA data_bytes;
+	FPGA_IPM_DATA words_data_res[msgLen/2];
+	FPGA_IPM_DATA words_mac_res[4];
+	FPGA_IPM_DATA words_mac_inv[4] = {0};
+	FPGA_IPM_DATA words_ct_inv[msgLen/2];
+
+	//Inversion
+	if ( opcode == GRAIN128AEAD_FPGA_OPCODE_ENCR ){
+		data_bytes = msgLen;
+		for(size_t j=0; j<data_bytes/2 ; j++){
+			words_ct_inv[(data_bytes/2 - 1) - j] =  msg[j];
+		}
+		memcpy(msg, words_ct_inv, sizeof(FPGA_IPM_DATA)*data_bytes/2);
+		for(size_t j=0; j<data_bytes/2 ; j++){
+		}
+	}else{
+		//post encryption , init decryption
+		data_bytes = msgLen - 8;
+
+		FPGA_IPM_DATA datain_mac[4];
+		FPGA_IPM_DATA datain_mac_inv[4] = {0};
+		FPGA_IPM_DATA datain_ct[data_bytes/2];
+		FPGA_IPM_DATA datain_ct_inv[data_bytes/2];
+
+		memcpy(datain_mac, msg + (data_bytes/2), sizeof(FPGA_IPM_DATA)*4);
+
+		memcpy(datain_ct, msg, sizeof(FPGA_IPM_DATA)*(data_bytes/2));
+
+		//MAC inversion
+		for(size_t j=0; j<4 ; j++){
+			datain_mac_inv[(4-1) - j] =  datain_mac[j];
+		}
+
+		//CT inversion
+		for(size_t j=0; j<data_bytes/2 ; j++){
+			datain_ct_inv[(data_bytes/2 - 1) - j] =  datain_ct[j];
+		}
+
+		memcpy(msg, datain_ct_inv, sizeof(FPGA_IPM_DATA)*(data_bytes/2));
+		memcpy(msg + (data_bytes/2), datain_mac_inv, sizeof(FPGA_IPM_DATA)*4);
+
+	}
 
 	// open a polling transaction
 	FPGA_IPM_open(GRAIN128AEAD_FPGA_CORE, opcode, 0, 0);
 
 	// write the key onto the data buffer
 	for(i=0; i < GRAIN128AEAD_FPGA_WORDS_KEY; i++) {
-		//key[i] = GRAIN128AEAD_FPGA_8_to_16(key[i] & 0x00FF, (key[i] & 0xFF00) >> 8);
-		//ret = FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, add, &key[i]);
 		FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, add, &key[i]);
 		add++;
 	}
 
 	// write the iv (nonce) onto the data buffer
 	 for(i=0; i < GRAIN128AEAD_FPGA_WORDS_IV; i++) {
-		//iv[i] = GRAIN128AEAD_FPGA_8_to_16(iv[i] & 0x00FF, (iv[i] & 0xFF00) >> 8);
-		//ret = FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, add, &iv[i]);
 		FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, add, &iv[i]);
 		add++;
 	 }
@@ -51,13 +101,12 @@ static void GRAIN128AEAD_FPGA_init_pack(FPGA_IPM_DATA *key,
 	 add+=GRAIN128AEAD_FPGA_WORDS_UNUSED;
 
 	 // write length(subMsg) | length(ad) onto the data buffer
-	 lengths = ( msgLen << 8) | adLen ;
+	 lengths = ( data_bytes << 8) | adLen ;
 	 FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, add, &lengths);
 	 add++;
 
 	 // write ad (Associated Data) onto the buffer
 	 for(i=0; i < adLen/2; i++) {
-		 //ret = FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, add, &ad[i]);
 		 FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, add, &ad[i]);
  	 	 add++;
 	 }
@@ -65,54 +114,90 @@ static void GRAIN128AEAD_FPGA_init_pack(FPGA_IPM_DATA *key,
 	 add = GRAIN128AEAD_FPGA_ADDR_MSG_INIT_PACK;
 
 	 for(i=0; i < msgLen/2; i++) {
-		 //ret = FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, add, &msg[i]);
-		 FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, add, &msg[i]);
+		 ret = FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, add, &msg[i]);
 	 	 add++;
 	 }
-
 	 FPGA_IPM_DATA tmp = 0x0;
-	// HAL_Delay(1000);
-	 // Polling
-	 polling_semaphore = 0x0000;
-	 FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, 0x3F, &polling_semaphore);
-	 while(polling_semaphore != 0xFFFF) {
-		FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, 0x3F, &polling_semaphore);
-		print_uart("Waiting for cipher...\r\n");
-	 }
+	 FPGA_IPM_DATA unlock_polling = 0;
 
 	 // Printing data buffer
-	 print_uart("..[INIT PACK]..\r\n");
+
 	 tmp = 0x0;
-	 add = 0;
-	 for(i=0; i < 64; i++) {
-		FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, add, &tmp);
-		print_uart("\r\n");
-		print_uart("@ addr = "); print_uart_int(add); print_uart(" -- result = "); print_uart_16(tmp);
-		add++;
-	}
+
+	 tmp = 0x0;
+	 FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, 0x3F, &tmp);
+
+	 if(tmp == 0xFFFF)
+		 unlock_polling = 1;
+	 else
+		 unlock_polling = 0;
+
+	// HAL_Delay(1000);
+	 // Polling
+
+	 if(unlock_polling == 0){
+		 polling_semaphore = 0x0000;
+		 FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, 0x3F, &polling_semaphore);
+
+		 while(polling_semaphore != (FPGA_IPM_DATA)0xFFFF) {
+			FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, 0x3F, &polling_semaphore);
+		 }
+	 }
+
+
+	 //Clean the polling word
+	 polling_semaphore = 0x0000;
+     FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, 0x3F, &polling_semaphore);
+	 // Printing data buffer
+	 tmp = 0x0;
 
 	//read out results from data buffer
 	add = GRAIN128AEAD_FPGA_ADDR_MSG_INIT_PACK;
 
-	// reading data buffer to retrieve IP core response
-	for(i=0; i < msgLen/2; i++, index_res++) {
-		FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, add, &res[index_res]);
+//////////////NEW INVERSION OUTPUT////////////////////////////////
+	for(i=0; i < data_bytes/2; i++) {
+		FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, add, &words_data_res[i]);
 		add++;
 	}
 
 	// Reading MAC only during enryption
-	if( opcode == GRAIN128AEAD_FPGA_OPCODE_ENCR || opcode == GRAIN128AEAD_FPGA_OPCODE_ENCR + 1 ) {
+	if( opcode == GRAIN128AEAD_FPGA_OPCODE_ENCR ) {
 		add = GRAIN128AEAD_FPGA_ADDR_MAC;
-		for(i=0; i < GRAIN128AEAD_FPGA_WORDS_MAC; i++, index_res++) {
-			FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, add, &res[index_res]);
+
+		for(i=0; i < GRAIN128AEAD_FPGA_WORDS_MAC; i++) {
+			FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, add, &words_mac_res[i]);
 			add++;
 		}
+		uint8_t ct_words, mac_words;
+		ct_words = data_bytes/2;
+		mac_words = 4;
+		//MAC invertion
+		for(size_t j=0; j<mac_words ; j++){
+			words_mac_inv[(mac_words-1) - j] =  words_mac_res[j];
+		}
+		//CT invertion
+		for(size_t j=0; j<ct_words ; j++){
+			words_ct_inv[(ct_words - 1) - j] =  words_data_res[j];
+		}
+		for(size_t i=0;i<ct_words;i++, index_res++)
+			res[index_res] = words_ct_inv[i];
+		for(size_t i=0;i<mac_words;i++, index_res++)
+			res[index_res] = words_mac_inv[i];
+
+	} else {
+
+		for(size_t j=0; j<data_bytes/2 ; j++){
+			words_ct_inv[((data_bytes/2) - 1) - j] =  words_data_res[j];
+		}
+		for(size_t i=0;i<data_bytes/2;i++, index_res++)
+			res[index_res] = words_ct_inv[i];
 	}
 
-	*i_res = index_res;
 
+	*i_res = index_res;
 	// close the polling transaction
 	FPGA_IPM_close(GRAIN128AEAD_FPGA_CORE);
+	//FPGA_CLEAR_DATA_BUFFER();
 }
 
 static void GRAIN128AEAD_FPGA_next_pack(FPGA_IPM_DATA *msg, uint8_t msgLen, FPGA_IPM_DATA *res, uint8_t *i_res, FPGA_IPM_OPCODE opcode)
@@ -123,12 +208,55 @@ static void GRAIN128AEAD_FPGA_next_pack(FPGA_IPM_DATA *msg, uint8_t msgLen, FPGA
 	FPGA_IPM_DATA polling_semaphore;
 	uint8_t index_res = *i_res;
 	int i;
+	FPGA_IPM_DATA data_bytes;
+	FPGA_IPM_DATA words_data_res[msgLen/2];
+	FPGA_IPM_DATA words_mac_res[4];
+	FPGA_IPM_DATA words_mac_inv[4] = {0};
+	FPGA_IPM_DATA words_ct_inv[msgLen/2];
+
+////////////////////NEW INVERSION////////////////////////////////////////////////////////////////////
+	//Inversion
+		if ( opcode == GRAIN128AEAD_FPGA_OPCODE_ENCR+1){
+			data_bytes = msgLen;
+			for(size_t j=0; j<data_bytes/2 ; j++){
+				words_ct_inv[(data_bytes/2 - 1) - j] =  msg[j];
+			}
+			memcpy(msg, words_ct_inv, sizeof(FPGA_IPM_DATA)*data_bytes/2);
+
+		}else{
+			//post encryption , init decryption
+			data_bytes = msgLen - 8;
+
+			FPGA_IPM_DATA datain_mac[4];
+			FPGA_IPM_DATA datain_mac_inv[4] = {0};
+			FPGA_IPM_DATA datain_ct[data_bytes/2];
+			FPGA_IPM_DATA datain_ct_inv[data_bytes/2];
+
+			memcpy(datain_mac, msg + (data_bytes/2), sizeof(FPGA_IPM_DATA)*4);
+
+			memcpy(datain_ct, msg, sizeof(FPGA_IPM_DATA)*(data_bytes/2));
+
+			//MAC inversion
+			for(size_t j=0; j<4 ; j++){
+				datain_mac_inv[(4-1) - j] =  datain_mac[j];
+			}
+
+			//CT inversion
+			for(size_t j=0; j<data_bytes/2 ; j++){
+				datain_ct_inv[(data_bytes/2 - 1) - j] =  datain_ct[j];
+			}
+
+			memcpy(msg, datain_ct_inv, sizeof(FPGA_IPM_DATA)*(data_bytes/2));
+			memcpy(msg + (data_bytes/2), datain_mac_inv, sizeof(FPGA_IPM_DATA)*4);
+		}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	// open a polling transaction
 	FPGA_IPM_open(GRAIN128AEAD_FPGA_CORE, opcode, 0, 0);
 
 	//write length
-	submsglength = (msgLen << 8);
+	submsglength = (data_bytes << 8);
 	FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, add, &submsglength);
 	add++;
 
@@ -139,46 +267,84 @@ static void GRAIN128AEAD_FPGA_next_pack(FPGA_IPM_DATA *msg, uint8_t msgLen, FPGA
 	}
 
 	FPGA_IPM_DATA tmp = 0x0;
-	// HAL_Delay(1000);
-	// Polling
-	polling_semaphore = 0x0000;
-	FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, 0x3F, &polling_semaphore);
-	while(polling_semaphore != 0xFFFF) {
-		FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, 0x3F, &polling_semaphore);
-		print_uart("Waiting for cipher...\r\n");
-	}
+	FPGA_IPM_DATA unlock_polling = 0;
 
 	 // Printing data buffer
-	print_uart("..[NEXT PACK]..\r\n");
 	 tmp = 0x0;
-	 add = 0;
-	 for(i=0; i < 64; i++) {
-		FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, add, &tmp);
-		print_uart("\r\n");
-		print_uart("@ addr = "); print_uart_int(add); print_uart(" -- result = "); print_uart_16(tmp);
-		add++;
-	}
 
+	 FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, 0x3F, &tmp);
+
+	 if(tmp == 0xFFFF)
+		 unlock_polling = 1;
+	 else
+		 unlock_polling = 0;
+
+	 // Polling
+
+	 if(unlock_polling == 0){
+		 polling_semaphore = 0x0000;
+		 FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, 0x3F, &polling_semaphore);
+
+		 while(polling_semaphore != (FPGA_IPM_DATA)0xFFFF) {
+			FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, 0x3F, &polling_semaphore);
+		 }
+	 }
+
+
+	 //Clean the polling word
+	 polling_semaphore = 0x0000;
+	 FPGA_IPM_write(GRAIN128AEAD_FPGA_CORE, 0x3F, &polling_semaphore);
+	 // Printing data buffer
+	 tmp = 0x0;
 	//read out results from data buffer
 	add = GRAIN128AEAD_FPGA_ADDR_MSG_NEXT_PACK;
-	for(i=0; i < msgLen/2; i++, index_res++) {
-		FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, add, &res[index_res]);
+
+
+//////////NEW INVERSION ///////////////////////////////////////////
+	for(i=0; i < data_bytes/2; i++) {
+		FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, add, &words_data_res[i]);
 		add++;
 	}
 
 	// Reading MAC only during enryption
-	if( opcode == GRAIN128AEAD_FPGA_OPCODE_ENCR || opcode == GRAIN128AEAD_FPGA_OPCODE_ENCR + 1 ) {
+	if( opcode == GRAIN128AEAD_FPGA_OPCODE_ENCR+1) {
 		add = GRAIN128AEAD_FPGA_ADDR_MAC;
-		for(i=0; i < GRAIN128AEAD_FPGA_WORDS_MAC; i++, index_res++) {
-			FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, add, &res[index_res]);
+
+		for(i=0; i < GRAIN128AEAD_FPGA_WORDS_MAC; i++) {
+			FPGA_IPM_read(GRAIN128AEAD_FPGA_CORE, add, &words_mac_res[i]);
 			add++;
 		}
+		uint8_t ct_words, mac_words;
+		ct_words = data_bytes/2;
+		mac_words = 4;
+		//MAC invertion
+		for(size_t j=0; j<mac_words ; j++){
+			words_mac_inv[(mac_words-1) - j] =  words_mac_res[j];
+		}
+		//CT invertion
+		for(size_t j=0; j<ct_words ; j++){
+			words_ct_inv[(ct_words - 1) - j] =  words_data_res[j];
+		}
+		for(size_t i=0;i<ct_words;i++, index_res++)
+			res[index_res] = words_ct_inv[i];
+
+		for(size_t i=0;i<mac_words;i++, index_res++)
+			res[index_res] = words_mac_inv[i];
+
+	} else {
+
+		for(size_t j=0; j<data_bytes/2 ; j++){
+			words_ct_inv[((data_bytes/2) - 1) - j] =  words_data_res[j];
+	}
+		for(size_t i=0;i<data_bytes/2;i++, index_res++)
+			res[index_res] = words_ct_inv[i];
 	}
 
 	*i_res = index_res;
 
 	// close the polling transaction
 	FPGA_IPM_close(GRAIN128AEAD_FPGA_CORE);
+
 }
 
 static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
@@ -189,20 +355,28 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 
 	int i, i_datain;
 	uint8_t i_res = 0;
-	//int t;
+
+	uint8_t mac_count = (datainLen/24);
+
+	if( opcode == GRAIN128AEAD_FPGA_OPCODE_ENCR){
+		(datainLen%24)!=0 ? mac_count++ : mac_count;
+	}else{
+		mac_count = 0;
+	}
+
 	uint8_t key_vhdl[32], *pos_key_vhdl = key_vhdl;
 	uint8_t iv_vhdl[24], *pos_iv_vhdl = iv_vhdl;
 	uint8_t datain_vhdl[datainLen*2], *pos_datain_vhdl = datain_vhdl;
 	uint8_t ad_vhdl[ADlen*2], *pos_ad_vhdl = ad_vhdl;
-	uint8_t res_vhdl[(datainLen + 8)*2];
-	//, *pos_res_vhdl = res_vhdl;
-	uint8_t dataOUT[(datainLen+8)*2];
+	uint8_t res_vhdl[(datainLen + mac_count*8)*2];
+	uint8_t dataOUT[(datainLen + mac_count*8)*2];
+
+
 
 	FPGA_IPM_DATA key_to_fpga[16];
 	FPGA_IPM_DATA iv_to_fpga[12];
 	FPGA_IPM_DATA datain_to_fpga[datainLen];
 	FPGA_IPM_DATA ad_to_fpga[ADlen];
-	//FPGA_IPM_DATA res_from_fpga[datainLen];
 
 
 	FPGA_IPM_DATA datainBlock[GRAIN128AEAD_FPGA_WORDS_NEXT_PACK], ADblock[GRAIN128AEAD_FPGA_WORDS_AD_MAX], keyBlock[GRAIN128AEAD_FPGA_WORDS_KEY], ivBlock[GRAIN128AEAD_FPGA_WORDS_IV];
@@ -210,8 +384,8 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 	uint8_t available_dataLen;
 	uint8_t words_init_pack, words_next_pack;
 	uint8_t subdatainLen;
-	//, subADlen;
-	resLen = datainLen + 1 + GRAIN128AEAD_FPGA_WORDS_MAC; // the result length will take into account the MAC and an extra word to manage the odd datainLen size
+
+	resLen = datainLen/2 + 1 + mac_count*GRAIN128AEAD_FPGA_WORDS_MAC; // the result length will take into account the MAC and an extra word to manage the odd datainLen size
 	FPGA_IPM_DATA res[resLen];
 
 	if( (key == NULL) || (IV == NULL) || (AD == NULL) )
@@ -237,15 +411,10 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 		}
 	}
 
-	for(size_t i=0;i<datainLen*2; i+=4){
-		for(size_t j=0; j<4; j++){
-			datain_vhdl[(datainLen*2)-1 - (3-j + i)] =  dataIN[i+j];
-		}
-	}
-
 	for(size_t i=0;i<ADlen*2; i+=4){
 		for(size_t j=0; j<4; j++){
 			ad_vhdl[(ADlen*2)-1 - (3-j + i)] =  AD[i+j];
+
 		}
 	}
 
@@ -260,16 +429,25 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 		iv_to_fpga[i] = ( to_hex(pos_iv_vhdl[2*i]) & 0x0F ) << 4 | ( to_hex(pos_iv_vhdl[2*i+1]) & 0x0F );
 		print_uart_8(iv_to_fpga[i]);
 	}
-	print_uart("\r\nMSG: ");
-	for (size_t i = 0; i < datainLen ; i++) {
-		datain_to_fpga[i] = ( to_hex(pos_datain_vhdl[2*i]) & 0x0F ) << 4 | ( to_hex(pos_datain_vhdl[2*i+1]) & 0x0F );
-		print_uart_8(datain_to_fpga[i]);
-	}
+
 	print_uart("\r\nAD: ");
 	for (size_t i = 0; i < ADlen ; i++) {
 		ad_to_fpga[i] = ( to_hex(pos_ad_vhdl[2*i]) & 0x0F ) << 4 | ( to_hex(pos_ad_vhdl[2*i+1]) & 0x0F );
 		print_uart_8(ad_to_fpga[i]);
 	}
+
+	if( opcode == GRAIN128AEAD_FPGA_OPCODE_ENCR){
+		print_uart("\r\nMSG: ");
+	}else{
+		print_uart("\r\nCT+MAC: ");
+	}
+
+	for (size_t i = 0; i < datainLen ; i++) {
+		datain_to_fpga[i] = ( to_hex(dataIN[2*i]) & 0x0F ) << 4 | ( to_hex(dataIN[2*i+1]) & 0x0F );
+		print_uart_8(datain_to_fpga[i]);
+	}
+
+
 
 	// transform KEY in a block of words ready to be written inside the data buffer
 	for(i = 0; i < GRAIN128AEAD_FPGA_WORDS_KEY ; i++ ){
@@ -300,12 +478,12 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 
 	if (opcode == GRAIN128AEAD_FPGA_OPCODE_ENCR ) {
 		available_dataLen = 2*GRAIN128AEAD_FPGA_AVAILABLE_WORDS_ENCR;
-		words_init_pack = 2*GRAIN128AEAD_FPGA_AVAILABLE_WORDS_ENCR;
-		words_next_pack = 2*GRAIN128AEAD_FPGA_AVAILABLE_WORDS_ENCR;
+		words_init_pack = GRAIN128AEAD_FPGA_AVAILABLE_WORDS_ENCR;
+		words_next_pack = GRAIN128AEAD_FPGA_AVAILABLE_WORDS_ENCR;
 	} else {
 		available_dataLen = 2*GRAIN128AEAD_FPGA_AVAILABLE_WORDS_DECR;
-		words_init_pack = 2*GRAIN128AEAD_FPGA_AVAILABLE_WORDS_DECR;
-		words_next_pack = 2*GRAIN128AEAD_FPGA_AVAILABLE_WORDS_DECR;
+		words_init_pack = GRAIN128AEAD_FPGA_AVAILABLE_WORDS_DECR;
+		words_next_pack = GRAIN128AEAD_FPGA_AVAILABLE_WORDS_DECR;
 	}
 
 	if (datainLen == 0) {
@@ -329,7 +507,7 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 				// save number of words created
 				subdatainLen = 2*words_init_pack;
 				// decrement the remaining datainLen of max msg words size
-				left -= 2*words_init_pack;
+				left = left - 2*words_init_pack;
 				// write INIT PACKET inside data buffer without getting MAC data
 				GRAIN128AEAD_FPGA_init_pack(keyBlock, ivBlock, ADblock, ADlen, datainBlock, subdatainLen, res, &i_res, opcode);
 			} else {
@@ -342,13 +520,12 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 				// save number of words created
 				subdatainLen = 2*words_next_pack;
 				// decrement the remaining datainLen of max msg words size
-				left -= 2*words_next_pack;
+				left = left - 2*words_next_pack;
 				// write NEXT PACKET inside data buffer without getting MAC data
 				GRAIN128AEAD_FPGA_next_pack(datainBlock, subdatainLen, res, &i_res, opcode + 1);
 
 			}
 		}
-
 		// Packet that does not fit a full init/next packet
 		for(i = 0; i < left/2 ; i++ ) {
 			datainBlock[i] = GRAIN128AEAD_FPGA_8_to_16(datain_to_fpga[i_datain], datain_to_fpga[i_datain + 1] );
@@ -358,7 +535,6 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 		subdatainLen = left;
 
 		if(left % 2 == 1) {
-			//datainBlock[i] = GRAIN128AEAD_FPGA_8_to_16(datain_to_fpga[i_datain], datain_to_fpga[i_datain + 1] );
 			datainBlock[i] = GRAIN128AEAD_FPGA_8_to_16(datain_to_fpga[i_datain], 0);
 			subdatainLen++;
 		}
@@ -381,26 +557,12 @@ static GRAIN128AEAD_FPGA_RETURN_CODE GRAIN128AEAD_CHIPHER(  uint8_t *key,
 	}
 
 	//Byte to hex
-	for (size_t i = 0; i < datainLen+8 ; i++) {
-		res_vhdl[2*i] = (( dataOUT[i] & 0xF0 ) >> 4);
-		res_vhdl[2*i+1] = ( dataOUT[i] & 0x0F );
+	for (size_t i = 0; i < (datainLen + mac_count*8) ; i++) {
+		res_hex[2*i] = (( dataOUT[i] & 0xF0 ) >> 4);
+		res_hex[2*i+1] = ( dataOUT[i] & 0x0F );
 	}
-	print_uart("\r\n");
-	print_uart("ctx = ");
-	for(size_t i=0;i<datainLen*2; i+=4){
-		for(size_t j=0; j<4; j++){
-			res_hex[(datainLen*2)-1 - (3-j + i)] =  res_vhdl[i+j];
-			print_uart_hex(res_hex[(datainLen*2)-1 - (3-j + i)]);
-		}
-	}
-	print_uart("\r\n");
-	print_uart("MAC = ");
-	for(size_t i=0;i<16; i+=4){
-		for(size_t j=0; j<4; j++){
-			res_hex[((datainLen+8)*2)-1 - (3-j + i)] =  res_vhdl[(datainLen*2)+i+j];
-			print_uart_hex(res_hex[((datainLen+8)*2)-1 - (3-j + i)]);
-		}
-	}
+
+
 
 	// **************************************************************
 	// **************************************************************
