@@ -6,7 +6,7 @@
 -- Version: 1.1
 -- Additional Comments: FSM-based controller to execute the encryp/decrypt APIs 
 ----------------------------------------------------------------------------------
-
+--Pulito telegram
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use ieee.numeric_std.all;
@@ -334,6 +334,7 @@ variable wc_to_wait_msg       : std_logic_vector(7 downto 0) := (others=>'0');	-
 variable encrypt_decrypt      : std_logic := '0';								--0 if encrypt, 1 if decrypt
 variable next_z_addressing    : std_logic_vector(9 downto 0);
 variable ct_ram_addressing	  : std_logic_vector(9 downto 0); 					--remove it if not used
+variable start_mac_address 	  : std_logic_vector(9 downto 0);
 
 variable debug : std_logic_vector(0 downto 0);
 begin
@@ -629,7 +630,7 @@ begin
 				--AD((15+(16*AD_count)) downto (16*AD_count)) <= swapsb(data_in(15 downto 8)) & swapsb(data_in(7 downto 0));	
 				AD(to_integer(unsigned(AD_count))) <= swapsb(data_in(15 downto 8));
 				AD(to_integer(unsigned(AD_count))+1) <= swapsb(data_in(7 downto 0));
-				
+				--report "AD: " & to_hstring((data_in(15 downto 8))) & " & " & to_hstring((data_in(7 downto 0)));
 		    	data_out <= (others => '0');
 		    	buffer_enable <= '0';
 		    	address <= (others => '0');
@@ -672,10 +673,7 @@ begin
 
 			WHEN READ_MSG =>
 				
-				Address_s <= MSG_count(4 downto 1);
-				Data_s <= swapsb(data_in(15 downto 8)) & swapsb(data_in(7 downto 0));
-				WE_s <= '1';
-				
+					
 		    	data_out <= (others => '0');
 		    	buffer_enable <= '0';
 		    	address <= (others => '0');
@@ -683,10 +681,16 @@ begin
 				interrupt <= '0';
 				error <= '0';
 				if(to_integer(unsigned(MSG_count)) < (to_integer(unsigned(lenght_submsg)))-1) then
+					Address_s <= MSG_count(4 downto 1);
+				Data_s <= swapsb(data_in(15 downto 8)) & swapsb(data_in(7 downto 0));
+				WE_s <= '1';
+				--report "MSG read: " & to_hstring(data_in) & " @ " & to_hstring(std_logic_vector(unsigned(MSG_count(4 downto 1))));	
 					MSG_count := std_logic_vector(to_unsigned(2, 10) + unsigned(MSG_count));
 					state <= WAIT_MSG;
 			    else
-				    MSG_count := std_logic_vector(to_unsigned(0, 10));
+					start_mac_address := MSG_Count;
+					MSG_count := std_logic_vector(to_unsigned(0, 10));
+					mac_count := std_logic_vector(to_unsigned(0, 8));
 			    	if(set_init_core = '1') then
 			    	    if(encrypt_decrypt = '0') then
 			    	        state <= INIT_CORE_IV;
@@ -704,9 +708,9 @@ begin
 			    
 ----------------READ FROM MSG FOR DECRYPTION----------------------
             WHEN WAIT_MAC_DECRYPTION =>
-                if(to_integer(unsigned(wc_count))> (to_integer(unsigned(wc_to_wait_msg)) + to_integer(unsigned(MSG_count))/2 + 4)) then
+                if(to_integer(unsigned(wc_count))> (to_integer(unsigned(wc_to_wait_msg)) + to_integer(unsigned(MSG_count))/2 )) then
 					buffer_enable <= '1';
-					address <= std_logic_vector(to_unsigned(to_integer(unsigned(MSG_count)) + to_integer(unsigned(msg_address_decode)) + 4, ADD_WIDTH));
+					address <= std_logic_vector(to_unsigned(to_integer(unsigned(MSG_count))/2 + to_integer(unsigned(msg_address_decode) ), ADD_WIDTH));
 					data_out <= (others => '0'); 
 					rw <= '0';
 					interrupt <= '0';
@@ -721,9 +725,6 @@ begin
 
 			WHEN READ_MAC_DECRYPTION =>
 				
-				Address_s <= std_logic_vector(unsigned(MSG_count(4 downto 1)) + 4);
-				Data_s <= swapsb(data_in(15 downto 8)) & swapsb(data_in(7 downto 0));
-				WE_s <= '1';
 				
 		    	data_out <= (others => '0');
 		    	buffer_enable <= '0';
@@ -731,11 +732,17 @@ begin
 				rw <= '0';
 				interrupt <= '0';
 				error <= '0';
-				if(to_integer(unsigned(MSG_count)) < 8) then
+				if(to_integer(unsigned(MSG_count)) < to_integer(unsigned(start_mac_address)) + 8) then
+					Address_s <= std_logic_vector(unsigned(MSG_count(4 downto 1)) );	--Modified +4 to +8
+					Data_s <= swapsb(data_in(15 downto 8)) & swapsb(data_in(7 downto 0));
+					WE_s <= '1';
+					--report "MAC read: " & to_hstring(data_in) & " @ " & to_hstring(std_logic_vector(unsigned(MSG_count(4 downto 1)))) & " data_buffer@ " & to_hstring(std_logic_vector(to_unsigned(to_integer(unsigned(MSG_count))/2 + to_integer(unsigned(msg_address_decode)), ADD_WIDTH)));				
 					MSG_count := std_logic_vector(to_unsigned(2, 10) + unsigned(MSG_count));
+					mac_Count := std_logic_vector(to_unsigned(2, 8) + unsigned(mac_Count));
 					state <= WAIT_MAC_DECRYPTION;
 			    else
 					MSG_count := std_logic_vector(to_unsigned(0, 10));
+					mac_Count := std_logic_vector(to_unsigned(0, 8));
 			    	if(set_init_core = '1') then
 			    		state <= INIT_CORE_IV;
 			    	else

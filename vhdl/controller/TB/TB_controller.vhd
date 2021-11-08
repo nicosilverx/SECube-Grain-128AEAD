@@ -64,10 +64,13 @@ architecture test of FPGA_testbench is
 	signal nwe		 : std_logic := '1';
 	signal ne1		 : std_logic := '1';
 	signal interrupt : std_logic;
-   
+        --Memory
+	type memory_128 is array (15 downto 0) of std_logic_vector(15 downto 0);
+	signal result_array : memory_128 := (others=>(others=>'0')); 
+	signal counter : integer := 0;
 begin
  
- 
+  
  
    UUT: entity work.TOP_ENTITY
    	generic map(
@@ -151,13 +154,15 @@ begin
 			result := data;
 		end read;
 		
+
+		
 	begin
 	   
 		wait for HCLK_PERIOD*24; -- random number of cc before starting
-		
+				
 --		--Init, encrypt 0
 		
-		write("000000", "100000" & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); 
+		write("000000", "100000" & CONF_OPEN_TRANSACTION_POLMODE & "0000001"); 
 		--Key (not swapped)
 		write("000001", x"def0"); --1
 		write("000010", x"9abc"); --2
@@ -175,192 +180,224 @@ begin
 		write("001101", x"4567"); --13
 		write("001110", x"0123"); --14
 		--Length msg || AD = 0x08 || 0x02 
-		write("010001", x"0802"); --17
+		write("010001", x"0e04"); --17
 		--AD
-		write("010010", x"1111"); --18
-		--write("010011", x"1111"); --18
+		write("010010", x"abcd"); --18
+		write("010011", x"0011"); --19
 		--Padding for AD
 		
 		
 		--MSG
-		write("011100", x"2121"); --28
-		write("011101", x"6e65"); --29
-		write("011110", x"616f"); --30
-		write("011111", x"6369"); --31
+		write("011100", x"3333"); --28
+		write("011101", x"2222"); --29
+		write("011110", x"1111"); --30
+		write("011111", x"dddd"); --31
+		write("100000", x"cccc"); --32
+		write("100001", x"bbbb"); --33
+		write("100010", x"aaaa"); --34
+		--write("100011", x"eeee"); --35
+		--write("100100", x"0021"); --36
+		--write("100101", x"6e65"); --37
+		--write("100110", x"616f"); --38
+		--write("100111", x"dddd"); --39
 		--Padding for MSG
 		
-        write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_INTMODE & "0000001");
+		--Polling word
+ 		write("111111", (others => '0'));
+		read("111111");
+ 		while result /= x"FFFF" loop
+ 			read("111111");
+ 		end loop;
 		
-		wait until rising_edge(interrupt);
-		wait until rising_edge(hclk); -- ISR is called syncronously
-		report "ho letto l'interrupt";
+ 		--CT
+ 		read("011100"); result_array(0) <= result; --28  		
+		read("011101"); result_array(1) <= result;--29
+ 		read("011110"); result_array(2) <= result;--30
+ 		read("011111"); result_array(3) <= result;--31
+		read("100000"); result_array(4) <= result;--32
+ 		read("100001"); result_array(5) <= result;--33
+ 		read("100010"); result_array(6) <= result;--34
+ 		read("100011"); result_array(7) <= result;--35
+ 		--MAC
+ 		read("101000"); result_array(8) <= result;--40
+ 		read("101001"); result_array(9) <= result;--41
+ 		read("101010"); result_array(10) <= result;--42
+ 		--read("101011"); result_array(11) <= result;--43
 		
-		read("000000");
-		write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_ACK & "0000001");
+		write("111111", (others => '0'));
+        write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_POLMODE & "0000001");
+		
+--		--Next, encrypt 1
+		
+		-- write("000000", "100001" & CONF_OPEN_TRANSACTION_POLMODE & "0000001"); 
+		-- --Lenght (not swapped)
+		-- write("000001", x"1800"); --1
+		-- --MSG
+		-- write("000010", x"0021"); --2
+		-- write("000011", x"6e65"); --3
+		-- write("000100", x"616f"); --4
+		-- write("000101", x"cccc"); --5
+		-- write("000110", x"0021"); --6
+		-- write("000111", x"6e65"); --7
+		-- write("001000", x"616f"); --8
+		-- write("001001", x"bbbb"); --9
+		-- write("001010", x"0021"); --10
+		-- write("001011", x"6e65"); --11
+		-- write("001100", x"616f"); --12
+		-- write("001101", x"aaaa"); --13
 
-		---- let the core necessary time for writing outputs and then read
-		wait for 60*HCLK_PERIOD;
+		-- --Polling word
+ 		-- write("111111", (others => '0'));
+		-- read("111111");
+ 		-- while result /= x"FFFF" loop
+ 		-- 	read("111111");
+ 		-- end loop;
 		
-		--CT
-		read("011100"); --28
-		read("011101"); --29
-		read("011110"); --30
-		read("011111"); --31
-		--MAC
-		read("100000"); --32
-		read("100001"); --33
-		read("100010"); --34
-		read("100011"); --35
+ 		-- --CT
+ 		-- read("000010"); result_array(0) <= result; --2	
+		-- read("000011"); result_array(1) <= result;--3
+ 		-- read("000100"); result_array(2) <= result;--4
+ 		-- read("000101"); result_array(3) <= result;--5
+		-- read("000110"); result_array(4) <= result;--6
+ 		-- read("000111"); result_array(5) <= result;--7
+ 		-- read("001000"); result_array(6) <= result;--8
+ 		-- read("001001"); result_array(7) <= result;--9
+ 		-- --MAC
+ 		-- read("001010"); result_array(8) <= result;--10
+ 		-- read("001011"); result_array(9) <= result;--11
+ 		-- read("001100"); result_array(10) <= result;--12
+ 		-- read("001101"); result_array(11) <= result;--13
 		
-		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_ACK & "0000001");
-		
---		--
---		--
---		--    Encrypt 1, second part of the message
---		--
---		--
-		
-		write("000000", "100001" & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); 
-		--Length msg || AD = 0x08 || 0x02 
-		write("000001", x"0800"); --1
-		--MSG
-		write("000010", x"2121"); --2
-		write("000011", x"6e65"); --3
-		write("000100", x"616f"); --4
-		write("000101", x"6369"); --5
-		--Padding for MSG
-		
-        write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_INTMODE & "0000001");
-		
-		wait until rising_edge(interrupt);
-		wait until rising_edge(hclk); -- ISR is called syncronously
-		report "ho letto l'interrupt";
-		
-		read("000000");
-		write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_ACK & "0000001");
+		-- write("111111", (others => '0'));
+        -- write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_POLMODE & "0000001");
 
-		---- let the core necessary time for writing outputs and then read
-		wait for 60*HCLK_PERIOD;
 		
-		--CT
-		read("000010"); --2
-		read("000011"); --3
-		read("000100"); --4
-		read("000101"); --5
-		--MAC
-		read("000110"); --6
-		read("000111"); --7
-		read("001000"); --8
-		read("001001"); --9
-		
-		write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_ACK & "0000001");
-
 --------------------------------------------------------------------------------------------------------------------------		
 -- 		Decrypt, init
-	-- 	write("000000", "100010" & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); 
+	 	write("000000", "100010" & CONF_OPEN_TRANSACTION_POLMODE & "0000001"); 
+				 
+	 	--Key (not swapped)
+	 	write("000001", x"def0"); --1
+	 	write("000010", x"9abc"); --2
+	 	write("000011", x"5678"); --3
+	 	write("000100", x"1234"); --4
+	 	write("000101", x"cdef"); --5
+	 	write("000110", x"89ab"); --6
+	 	write("000111", x"4567"); --7
+	 	write("001000", x"0123"); --8
+	 	--IV (not swapped)
+	 	write("001001", x"5678"); --9
+	 	write("001010", x"1234"); --10
+	 	write("001011", x"cdef"); --11
+	 	write("001100", x"89ab"); --12
+	 	write("001101", x"4567"); --13
+	 	write("001110", x"0123"); --14
+	 	                          --15
+	 	--Two of padding          -16
 		
+	 	--Length ct || AD = 0x08 || 0x02 
+	 	write("010001", x"0e04");
+	 	--AD
+	 	write("010010", x"abcd"); --18
+		write("010011", x"0011"); --19
+
+		--CT
+        write("011100", x"51c0"); --28
+	 	write("011101", x"51a6"); --29
+	 	write("011110", x"1f37"); --30
+	 	write("011111", x"2a9c"); --31
+		write("100000", x"6c36"); --32
+	 	write("100001", x"6448"); --33
+	 	write("100010", x"0062"); --34
+	 	write("100011", x"0968"); --35
+		write("100100", x"0d07"); --36		
+		write("100101", x"b888"); --37
+		write("100110", x"5a1e"); --38
+		--write("100111", x"0000"); --39
+		--MAC
+		--write("101000", x"0968"); --40
+		--write("101001", x"b7ac"); --41
+		--write("101010", x"c902"); --42
+		--write("101011", x"c2ad"); --43
+
+		
+		--Wait for polling
+		--Polling word
+ 		write("111111", (others => '0'));
+		read("111111");
+ 		while result /= x"FFFF" loop
+ 			read("111111");
+ 		end loop;
+		write("111111", (others => '0'));
+		
+		--CT
+ 		read("011100"); result_array(0) <= result; --28  		
+		read("011101"); result_array(1) <= result;--29
+ 		read("011110"); result_array(2) <= result;--30
+ 		read("011111"); result_array(3) <= result;--31
+		read("100000"); result_array(4) <= result;--32
+ 		read("100001"); result_array(5) <= result;--33
+ 		read("100010"); result_array(6) <= result;--34
+ 		--read("100011"); result_array(7) <= result;--35
+		--read("100100"); result_array(8) <= result;--36
+		--read("100101"); result_array(9) <= result;--37
+		--read("100110"); result_array(10) <= result;--38
+		--read("100111"); result_array(11) <= result;--39
+		
+		report "End of transaction";
+
+	 	write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_POLMODE & "0000001");
+
+
+	-- 	-- 		Decrypt, next
+	-- 	write("000000", "100011" & CONF_OPEN_TRANSACTION_POLMODE & "0000001"); 
+				 
 	-- 	--Key (not swapped)
-	-- 	write("000001", x"def0"); --1
-	-- 	write("000010", x"9abc"); --2
-	-- 	write("000011", x"5678"); --3
-	-- 	write("000100", x"1234"); --4
-	-- 	write("000101", x"cdef"); --5
-	-- 	write("000110", x"89ab"); --6
-	-- 	write("000111", x"4567"); --7
-	-- 	write("001000", x"0123"); --8
-	-- 	--IV (not swapped)
-	-- 	write("001001", x"5678"); --9
-	-- 	write("001010", x"1234"); --10
-	-- 	write("001011", x"cdef"); --11
-	-- 	write("001100", x"89ab"); --12
-	-- 	write("001101", x"4567"); --13
-	-- 	write("001110", x"0123"); --14
-	-- 	                          --15
-	-- 	--Two of padding          -16
-		
-	-- 	--Length ct || AD = 0x08 || 0x02 
-	-- 	write("010001", x"0802");
-	-- 	--AD
-	-- 	write("010010", x"1111"); --18
-	-- 	--CT : 475f cba7 b196 81db 31e4 dcfe abe4 d624
-    --     write("011100", x"81db"); --28
-	-- 	write("011101", x"b196"); --29
-	-- 	write("011110", x"cba7"); --30
-	-- 	write("011111", x"475f"); --31
-	-- 	--MAC
-	-- 	write("100000", x"d624"); --32
-	-- 	write("100001", x"abe4"); --33
-	-- 	write("100010", x"dcfe"); --34
-	-- 	write("100011", x"31e4"); --35
-		
-	-- 	write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_INTMODE & "0000001");
-		
-	-- 	wait until rising_edge(interrupt);
-	-- 	wait until rising_edge(hclk); -- ISR is called syncronously
-	-- 	report "ho letto l'interrupt";
-		
-	-- 	read("000000");
-	-- 	write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_ACK & "0000001");
-		
-	-- 	---- let the core necessary time for writing outputs and then read
-	-- 	wait for 60*HCLK_PERIOD;
-		
-	-- 	--MSG
-	-- 	read("011100"); --28
-	-- 	read("011101"); --29
-	-- 	read("011110"); --30
-	-- 	read("011111"); --31
-	-- 	--MAC
-	-- 	read("100000"); --32
-	-- 	read("100001"); --33
-	-- 	read("100010"); --34
-	-- 	read("100011"); --35
-		
-	-- 	write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_ACK & "0000001");
-		
-		
-	-- 	--Decrypt the second message
-	-- 	write("000000", "100011" & CONF_OPEN_TRANSACTION_INTMODE & "0000001"); 
-		
-	
-	-- 	--Length ct || CT = 0x08 
-	-- 	write("000001", x"0800");
-	-- 	--AD
-	-- 	--CT : 475f cba7 b196 81db 31e4 dcfe abe4 d624
-    --    write("000010", x"3122"); --2
-	-- 	write("000011", x"3f3a"); --3
-	-- 	write("000100", x"8b4a"); --4
-	-- 	write("000101", x"e195"); --5
-	-- 	--MAC
-	-- 	write("000110", x"5baa"); --6
-	-- 	write("000111", x"1a38"); --7
-	-- 	write("001000", x"2305"); --8
-	-- 	write("001001", x"4caa"); --9
-		
-	-- 	write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_INTMODE & "0000001");
-		
-	-- 	wait until rising_edge(interrupt);
-	-- 	wait until rising_edge(hclk); -- ISR is called syncronously
-	-- 	report "ho letto l'interrupt";
-		
-	-- 	read("000000");
-	-- 	write("000000", OPCODE_VOID & CONF_OPEN_TRANSACTION_ACK & "0000001");
-		
-	-- 	---- let the core necessary time for writing outputs and then read
-	-- 	wait for 60*HCLK_PERIOD;
-		
-	-- 	--MSG
-	-- 	read("000010"); --2
-	-- 	read("000011"); --3
-	-- 	read("000100"); --4
-	-- 	read("000101"); --5
-	-- 	--MAC
-	-- 	read("000110"); --6
-	-- 	read("000111"); --7
-	-- 	read("001000"); --8
-	-- 	read("001001"); --9
-		
-	-- 	write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_ACK & "0000001");		
+	-- 	write("000001", x"1800"); --1
+	-- 	write("000010", x"143c"); --2
+	-- 	write("000011", x"7080"); --3
+	-- 	write("000100", x"1784"); --4
+	-- 	write("000101", x"7444"); --5
+	-- 	write("000110", x"2616"); --6
+	-- 	write("000111", x"dd14"); --7
+	-- 	write("001000", x"6347"); --8
+	-- 	write("001001", x"b3d3"); --9
+	-- 	write("001010", x"ab27"); --10
+	-- 	write("001011", x"3b90"); --11
+	-- 	write("001100", x"1057"); --12
+	-- 	write("001101", x"1cc4"); --13
+	-- 	write("001110", x"a45e"); --14
+	-- 	write("001111", x"8660"); --15
+	-- 	write("010000", x"4ef7"); --16
+	-- 	write("010001", x"6a8c"); --17
+	   
+
+	--    --Wait for polling
+	--    --Polling word
+	-- 	write("111111", (others => '0'));
+	--    read("111111");
+	-- 	while result /= x"FFFF" loop
+	-- 		read("111111");
+	-- 	end loop;
+	--    write("111111", (others => '0'));
+	   
+	--    --CT
+	-- 	read("011100"); result_array(0) <= result; --28  		
+	--    read("011101"); result_array(1) <= result;--29
+	-- 	read("011110"); result_array(2) <= result;--30
+	-- 	read("011111"); result_array(3) <= result;--31
+	--    read("100000"); result_array(4) <= result;--32
+	-- 	read("100001"); result_array(5) <= result;--33
+	-- 	read("100010"); result_array(6) <= result;--34
+	-- 	read("100011"); result_array(7) <= result;--35
+	--    read("100100"); result_array(8) <= result;--36
+	--    read("100101"); result_array(9) <= result;--37
+	--    read("100110"); result_array(10) <= result;--38
+	--    read("100111"); result_array(11) <= result;--39
+	   
+	--    report "End of transaction";
+
+	-- 	write("000000", OPCODE_VOID & CONF_CLOSE_TRANSACTION_POLMODE & "0000001");
 ------------------------------------------------------------------------------------------------------------
 	wait;
 	end process stimuli;
